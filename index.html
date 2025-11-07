@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebRTC Webcam Streaming - Ultra Low Latency</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <style>
         * {
             margin: 0;
@@ -378,6 +379,24 @@
                 </select>
             </div>
 
+            <div class="quality-selector">
+                <label>Max Bitrate (Mbps) - Higher = Better Quality</label>
+                <select id="bitrateLimit">
+                    <option value="1000">1 Mbps (Low)</option>
+                    <option value="2500">2.5 Mbps (Medium)</option>
+                    <option value="5000">5 Mbps (High)</option>
+                    <option value="10000" selected>10 Mbps (Very High)</option>
+                    <option value="20000">20 Mbps (Ultra)</option>
+                    <option value="0">Unlimited</option>
+                </select>
+            </div>
+
+            <div class="quality-selector">
+                <label>PeerJS Server (for stability)</label>
+                <input type="text" id="peerServer" placeholder="Leave empty for default (0.peerjs.com)" style="margin-bottom: 5px;">
+                <small style="color: #86868b; font-size: 0.85em;">Custom server: your-server.com (no https://)</small>
+            </div>
+
             <button id="startBroadcast" onclick="startBroadcast()">Start Webcam</button>
 
             <div id="broadcastInfo" style="display: none;">
@@ -554,6 +573,7 @@
                 fps: [],
                 bitrate: [],
                 latency: [],
+                jitter: [],
                 packetLoss: []
             }
         };
@@ -664,7 +684,7 @@
                             yAxisID: 'y'
                         },
                         {
-                            label: '비트레이트 (kbps)',
+                            label: 'Bitrate (kbps)',
                             data: [],
                             borderColor: '#34C759',
                             backgroundColor: 'rgba(52, 199, 89, 0.1)',
@@ -672,7 +692,7 @@
                             yAxisID: 'y1'
                         },
                         {
-                            label: '레이턴시 (ms)',
+                            label: 'Latency (ms)',
                             data: [],
                             borderColor: '#FF9500',
                             backgroundColor: 'rgba(255, 149, 0, 0.1)',
@@ -680,7 +700,15 @@
                             yAxisID: 'y2'
                         },
                         {
-                            label: '패킷 손실 (%)',
+                            label: 'Jitter (ms)',
+                            data: [],
+                            borderColor: '#AF52DE',
+                            backgroundColor: 'rgba(175, 82, 222, 0.1)',
+                            tension: 0.4,
+                            yAxisID: 'y4'
+                        },
+                        {
+                            label: 'Packet Loss (%)',
                             data: [],
                             borderColor: '#FF3B30',
                             backgroundColor: 'rgba(255, 59, 48, 0.1)',
@@ -744,6 +772,12 @@
                             display: false,
                             min: 0,
                             max: 10
+                        },
+                        y4: {
+                            type: 'linear',
+                            display: false,
+                            min: 0,
+                            max: 50
                         }
                     }
                 }
@@ -751,7 +785,7 @@
         }
 
         // 그래프 데이터 업데이트
-        function updateChartData(isBroadcaster, fps, bitrate, latency, packetLoss) {
+        function updateChartData(isBroadcaster, fps, bitrate, latency, jitter, packetLoss) {
             const now = new Date().toLocaleTimeString();
             const data = isBroadcaster ? chartData.broadcaster : chartData.viewer;
             const chart = isBroadcaster ? broadcasterChart : viewerChart;
@@ -780,6 +814,12 @@
                 if (data.latency.length > maxDataPoints) {
                     data.latency.shift();
                 }
+
+                // Jitter (시청자만)
+                data.jitter.push(jitter || 0);
+                if (data.jitter.length > maxDataPoints) {
+                    data.jitter.shift();
+                }
             }
 
             // 패킷 손실
@@ -797,7 +837,8 @@
                     chart.data.datasets[2].data = data.packetLoss;
                 } else {
                     chart.data.datasets[2].data = data.latency;
-                    chart.data.datasets[3].data = data.packetLoss;
+                    chart.data.datasets[3].data = data.jitter;
+                    chart.data.datasets[4].data = data.packetLoss;
                 }
                 chart.update('none'); // 애니메이션 없이 업데이트
             }
@@ -875,7 +916,7 @@
                 });
 
                 // 그래프 업데이트
-                updateChartData(true, currentFps, currentBitrate, 0, currentPacketLoss);
+                updateChartData(true, currentFps, currentBitrate, 0, 0, currentPacketLoss);
 
                 lastStatsTime = now;
             } catch (err) {
@@ -894,6 +935,7 @@
                 let currentFps = 0;
                 let currentBitrate = 0;
                 let currentLatency = 0;
+                let currentJitter = 0;
                 let currentPacketLoss = 0;
 
                 stats.forEach(report => {
@@ -922,8 +964,8 @@
 
                         // 지터
                         if (report.jitter !== undefined) {
-                            document.getElementById('rxJitter').textContent =
-                                `${(report.jitter * 1000).toFixed(1)} ms`;
+                            currentJitter = parseFloat((report.jitter * 1000).toFixed(1));
+                            document.getElementById('rxJitter').textContent = `${currentJitter} ms`;
                         }
 
                         // 패킷 손실
@@ -961,7 +1003,7 @@
                 });
 
                 // 그래프 업데이트
-                updateChartData(false, currentFps, currentBitrate, currentLatency, currentPacketLoss);
+                updateChartData(false, currentFps, currentBitrate, currentLatency, currentJitter, currentPacketLoss);
 
                 lastStatsTime = now;
             } catch (err) {
@@ -1016,6 +1058,7 @@
             chartData.viewer.fps = [];
             chartData.viewer.bitrate = [];
             chartData.viewer.latency = [];
+            chartData.viewer.jitter = [];
             chartData.viewer.packetLoss = [];
         }
 
@@ -1083,13 +1126,28 @@
                     { urls: 'stun:stun1.l.google.com:19302' }
                 ];
 
-                // Peer 초기화
-                peer = new Peer({
+                // 비트레이트 제한 가져오기
+                const maxBitrate = parseInt(document.getElementById('bitrateLimit').value);
+
+                // 커스텀 PeerJS 서버 설정
+                const customServer = document.getElementById('peerServer').value.trim();
+                const peerConfig = {
                     config: {
                         iceServers: iceServers,
                         iceTransportPolicy: connectionMode === 'lan' ? 'all' : 'all'
                     }
-                });
+                };
+
+                // 커스텀 서버가 있으면 추가
+                if (customServer) {
+                    peerConfig.host = customServer;
+                    peerConfig.port = 443;
+                    peerConfig.path = '/';
+                    peerConfig.secure = true;
+                }
+
+                // Peer 초기화
+                peer = new Peer(peerConfig);
 
                 peer.on('open', (id) => {
                     document.getElementById('myPeerId').value = id;
@@ -1115,10 +1173,26 @@
                 });
 
                 peer.on('call', (call) => {
-                    // 시청자의 연결 수락
+                    // 시청자의 연결 수락 with bitrate limit
                     call.answer(localStream);
                     connections.add(call);
                     updateViewerCount();
+
+                    // 비트레이트 제한 적용
+                    if (maxBitrate > 0 && call.peerConnection) {
+                        const pc = call.peerConnection;
+                        const senders = pc.getSenders();
+                        senders.forEach(sender => {
+                            if (sender.track && sender.track.kind === 'video') {
+                                const parameters = sender.getParameters();
+                                if (!parameters.encodings) {
+                                    parameters.encodings = [{}];
+                                }
+                                parameters.encodings[0].maxBitrate = maxBitrate * 1000; // kbps to bps
+                                sender.setParameters(parameters).catch(e => console.log('Bitrate limit failed:', e));
+                            }
+                        });
+                    }
 
                     // 통계 모니터링 시작
                     if (connections.size === 1) {
@@ -1139,7 +1213,14 @@
                 });
 
                 peer.on('error', (err) => {
-                    showStatus('broadcastStatus', 'Error: ' + err.message, 'error');
+                    console.error('Peer error:', err);
+                    if (err.type === 'network' || err.type === 'server-error') {
+                        showStatus('broadcastStatus', 'Connection error. Check PeerJS server or try custom server.', 'error');
+                    } else if (err.type === 'unavailable-id') {
+                        showStatus('broadcastStatus', 'ID already in use. Refresh page to get new ID.', 'error');
+                    } else {
+                        showStatus('broadcastStatus', 'Error: ' + err.message + ' (Try custom PeerJS server)', 'error');
+                    }
                 });
 
             } catch (err) {
