@@ -1,80 +1,198 @@
-# 📹 웹캠 실시간 스트리밍
+# 📹 WebRTC Webcam Streaming
 
-WebRTC 기반 저지연 P2P 웹캠 스트리밍 서비스
+Ultra-low latency P2P video streaming solution using WebRTC technology. Stream your webcam with sub-200ms latency over local networks or the internet.
 
-## ✨ 특징
+## 🌐 Live Demo
 
-- 🚀 **초저지연** - WebRTC P2P 직접 연결
-- 🌐 **서버 불필요** - 완전 클라이언트 사이드
-- 🔒 **안전한 연결** - HTTPS + 암호화된 스트림
-- 📱 **반응형 디자인** - 모바일/태블릿/데스크톱 지원
-- 🎨 **깔끔한 UI** - 모던하고 직관적인 인터페이스
+**https://hwkim3330.github.io/cam/**
 
-## 🎯 사용 방법
+## ✨ Features
 
-### 송출자 (Broadcaster)
-1. "📡 송출하기" 탭 선택
-2. "웹캠 시작" 버튼 클릭
-3. 브라우저 권한 허용
-4. 생성된 **공유 ID**를 시청자에게 전달
+### 🎥 Video Streaming
+- **Ultra Low Latency**: Sub-200ms latency with P2P WebRTC
+- **High Resolution**: Support from SD (640x480) to 4K (3840x2160)
+- **Adaptive Quality**: Automatic bitrate adjustment based on network conditions
+- **Multi-codec Support**: VP8, VP9, H.264 hardware acceleration
 
-### 시청자 (Viewer)
-1. "👀 시청하기" 탭 선택
-2. 송출자가 공유한 **ID 입력**
-3. "연결하기" 버튼 클릭
-4. 실시간 스트림 시청
+### 🌐 Network Modes
+- **P2P Mode**: Internet streaming with STUN/TURN servers
+- **LAN-Only Mode**: Direct local network connection (like GStreamer)
+- **Auto NAT Traversal**: Works behind routers and firewalls
 
-## 🔧 기술 스택
+### 📊 Real-time Analytics
+- **Resolution & Frame Rate**: Live video quality metrics
+- **Bitrate Monitoring**: Upload/download bandwidth usage
+- **Latency Tracking**: Round-trip time (RTT) measurement
+- **Jitter Analysis**: Network stability indicators
+- **Packet Loss Rate**: Connection quality assessment
+- **Network Information**: IP addresses, transport protocol (UDP/TCP), connection type
 
-- **WebRTC** - 실시간 P2P 통신
-- **PeerJS** - WebRTC 추상화 라이브러리
-- **Vanilla JS** - 프레임워크 없이 순수 JavaScript
-- **HTML5/CSS3** - 모던 웹 표준
+### 📱 QR Code Sharing
+- **Instant Connect**: Generate QR code for mobile viewers
+- **Auto-connect**: Scan and start watching immediately
+- **URL Sharing**: Share via messaging apps
 
-## 🌐 네트워크 요구사항
+### 📈 Performance Graphs
+- **Real-time Charts**: Live visualization of metrics
+- **30-second History**: Trend analysis
+- **Multi-metric Display**: FPS, bitrate, latency, packet loss
 
-- 양쪽 모두 인터넷 연결 필요
-- 내부망(사설 IP)에서도 작동
-- NAT/방화벽 자동 통과 (STUN 서버 사용)
-- 포트포워딩 불필요
+## 🚀 Quick Start
 
-## 📊 성능
+### Broadcaster (Webcam Owner)
+1. Open https://hwkim3330.github.io/cam/
+2. Select **Broadcast** mode
+3. Choose resolution (recommended: Full HD 1920x1080)
+4. Select connection mode:
+   - **P2P**: For internet streaming
+   - **LAN Only**: For local network only
+5. Click "Start Webcam"
+6. Share the generated ID or QR code with viewers
 
-- **지연시간**: 100-300ms (네트워크 환경에 따라)
-- **해상도**: 최대 1280x720 (720p)
-- **프레임레이트**: 30fps
-- **다중 시청자**: 동시 여러 명 지원
+### Viewer (Watching)
+1. Open https://hwkim3330.github.io/cam/
+2. Select **Watch** mode
+3. Enter the broadcaster's ID
+4. Click "Connect"
+5. Start watching the live stream!
 
-## 🚀 로컬 실행
+**Or** scan the QR code with your smartphone to auto-connect.
 
-```bash
-# 간단한 HTTP 서버 실행
-python3 -m http.server 8000
+## 🛠️ Technical Details
 
-# 또는
-npx serve
+### Technology Stack
+- **WebRTC**: Peer-to-peer real-time communication
+- **PeerJS**: WebRTC abstraction library
+- **Chart.js**: Real-time performance charts
+- **QRCode.js**: QR code generation
+- **Vanilla JavaScript**: No framework dependencies
 
-# 브라우저에서 접속
-http://localhost:8000
+### Network Architecture
+```
+Broadcaster                    Viewer
+    |                            |
+    |------ WebRTC P2P --------->|
+    |    (STUN/TURN assist)      |
+    |                            |
+    |<----- Stats Reports -------|
 ```
 
-## 🔒 보안 및 프라이버시
+### LAN-Only Mode
+When **LAN Only** is selected:
+- No STUN/TURN servers used
+- Direct peer-to-peer connection
+- Minimal latency (50-100ms)
+- Works only within same local network
+- Perfect for:
+  - Home surveillance
+  - Local presentations
+  - Internal testing
+  - High-security environments
 
-- **HTTPS 필수** - GitHub Pages는 자동 HTTPS 제공
-- **직접 P2P** - 중간 서버를 거치지 않음
-- **임시 ID** - 페이지 새로고침 시 ID 변경
-- **권한 기반** - 사용자가 명시적으로 웹캠 허용
+### Supported Browsers
+- ✅ Chrome/Edge 80+
+- ✅ Firefox 75+
+- ✅ Safari 14+
+- ✅ Opera 67+
+- ✅ Mobile browsers (iOS Safari, Chrome Android)
 
-## ⚠️ 주의사항
+## 📊 Performance Metrics
 
-- **HTTPS 환경 필요** - 로컬 테스트 시 `localhost` 사용
-- **웹캠 권한** - 브라우저에서 웹캠/마이크 접근 허용 필요
-- **방화벽** - 극히 드물게 기업 방화벽에서 차단될 수 있음
+| Metric | Description | Typical Value |
+|--------|-------------|---------------|
+| **Latency** | Round-trip time | 50-200ms (LAN), 100-500ms (Internet) |
+| **Bitrate** | Video data rate | 1-10 Mbps (depends on resolution) |
+| **Frame Rate** | Frames per second | 30 fps |
+| **Packet Loss** | Lost packets | <1% (good connection) |
+| **Jitter** | Timing variation | <10ms (stable connection) |
 
-## 📝 라이선스
+## 🔧 Advanced Usage
 
-MIT License
+### Custom Resolution
+Edit the resolution dropdown to add custom sizes:
+```html
+<option value="3840x2160">4K - 3840x2160</option>
+<option value="7680x4320">8K - 7680x4320</option>
+```
 
-## 🙋‍♂️ 문의
+### Network Optimization
+For best performance:
+- **LAN**: Use LAN-only mode, wired Ethernet preferred
+- **Internet**: Use P2P mode, upload speed ≥ bitrate required
+- **Low Bandwidth**: Choose lower resolution (HD or SD)
+- **High Quality**: Choose Full HD or 4K with good network
 
-이슈나 개선사항은 GitHub Issues에 등록해주세요.
+### Firewall Configuration
+If connection fails:
+1. Ensure UDP ports are open
+2. Check if STUN servers are accessible
+3. Consider using LAN-only mode for local networks
+
+## 🔒 Privacy & Security
+
+- **No Server Storage**: All streaming is peer-to-peer
+- **Temporary IDs**: Connection IDs change on each session
+- **HTTPS Only**: Encrypted signaling
+- **Local First**: LAN mode stays within your network
+- **No Account Required**: Anonymous usage
+
+## 🌟 Use Cases
+
+### Professional
+- 🎬 Live presentations and demos
+- 📡 Remote monitoring and surveillance
+- 🎓 Online teaching and tutoring
+- 👥 Video conferencing (1-to-1)
+
+### Personal
+- 🏠 Home security camera
+- 👶 Baby monitor
+- 🐾 Pet cam
+- 🎮 Gameplay streaming (webcam)
+
+### Development
+- 🧪 WebRTC testing
+- 📊 Network analysis
+- 🔬 Latency research
+- 💻 Video codec comparison
+
+## 🐛 Troubleshooting
+
+### No Video Showing
+- Check browser permissions (camera/microphone)
+- Verify webcam is not used by another application
+- Try different browser
+- Check F12 console for errors
+
+### High Latency
+- Switch to LAN-only mode if on same network
+- Check network bandwidth
+- Reduce resolution
+- Close bandwidth-heavy applications
+
+### Connection Failed
+- Verify both sides have internet access (P2P mode)
+- Check firewall settings
+- Try LAN-only mode for local networks
+- Ensure correct ID is entered
+
+## 📝 License
+
+MIT License - feel free to use for personal or commercial projects
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit pull requests.
+
+## 📬 Support
+
+For issues or questions:
+- Open an issue on GitHub
+- Check browser console for error messages
+- Verify WebRTC is supported in your browser
+
+---
+
+**Built with ❤️ using WebRTC**
+
+*Zero server costs, infinite possibilities*

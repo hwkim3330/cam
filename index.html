@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>웹캠 실시간 스트리밍 - WebRTC</title>
+    <title>WebRTC Webcam Streaming - Ultra Low Latency</title>
     <style>
         * {
             margin: 0;
@@ -345,46 +345,54 @@
 </head>
 <body>
     <div class="container">
-        <h1>📹 웹캠 실시간 스트리밍</h1>
-        <p class="subtitle">WebRTC P2P 저지연 스트리밍</p>
+        <h1>📹 WebRTC Webcam Streaming</h1>
+        <p class="subtitle">Ultra Low Latency P2P Video Streaming</p>
 
         <div class="mode-selector">
-            <button class="mode-btn active" onclick="setMode('broadcast')">📡 송출하기</button>
-            <button class="mode-btn" onclick="setMode('viewer')">👀 시청하기</button>
+            <button class="mode-btn active" onclick="setMode('broadcast')">📡 Broadcast</button>
+            <button class="mode-btn" onclick="setMode('viewer')">👀 Watch</button>
         </div>
 
-        <!-- 송출 패널 -->
+        <!-- Broadcast Panel -->
         <div id="broadcast-panel" class="panel active">
             <div class="info-box">
-                <strong>송출 모드:</strong> 내 웹캠을 다른 사람에게 공유합니다.
+                <strong>Broadcast Mode:</strong> Share your webcam with others.
             </div>
 
             <div class="quality-selector">
-                <label>해상도 설정</label>
+                <label>Resolution Settings</label>
                 <select id="resolutionSelect">
                     <option value="640x480">SD - 640x480</option>
-                    <option value="1280x720" selected>HD - 1280x720</option>
-                    <option value="1920x1080">Full HD - 1920x1080</option>
+                    <option value="1280x720">HD - 1280x720</option>
+                    <option value="1920x1080" selected>Full HD - 1920x1080</option>
                     <option value="2560x1440">2K - 2560x1440</option>
                     <option value="3840x2160">4K - 3840x2160</option>
                 </select>
             </div>
 
-            <button id="startBroadcast" onclick="startBroadcast()">웹캠 시작</button>
+            <div class="quality-selector">
+                <label>Connection Mode</label>
+                <select id="connectionMode">
+                    <option value="p2p" selected>P2P (Internet - uses STUN)</option>
+                    <option value="lan">LAN Only (Local Network)</option>
+                </select>
+            </div>
+
+            <button id="startBroadcast" onclick="startBroadcast()">Start Webcam</button>
 
             <div id="broadcastInfo" style="display: none;">
                 <div class="input-group">
-                    <label>공유 ID (다른 사람에게 전달하세요)</label>
+                    <label>Share ID (Send this to viewers)</label>
                     <div style="display: flex; gap: 10px;">
                         <input type="text" id="myPeerId" readonly>
-                        <button class="copy-btn" onclick="copyPeerId()">복사</button>
+                        <button class="copy-btn" onclick="copyPeerId()">Copy</button>
                     </div>
                 </div>
 
                 <div class="qr-section">
-                    <div class="qr-title">QR 코드로 공유</div>
+                    <div class="qr-title">Share via QR Code</div>
                     <div id="qrcode"></div>
-                    <div class="qr-instruction">스마트폰으로 스캔하면 바로 시청 시작</div>
+                    <div class="qr-instruction">Scan with smartphone to start watching</div>
                 </div>
 
                 <div class="video-container">
@@ -393,33 +401,45 @@
 
                 <div class="stats">
                     <div class="stat-item">
-                        <div class="stat-label">연결된 시청자</div>
+                        <div class="stat-label">Connected Viewers</div>
                         <div class="stat-value" id="viewerCount">0</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-label">해상도</div>
+                        <div class="stat-label">Resolution</div>
                         <div class="stat-value" id="txResolution">-</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-label">프레임레이트</div>
+                        <div class="stat-label">Frame Rate</div>
                         <div class="stat-value" id="txFps">-</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-label">비트레이트</div>
+                        <div class="stat-label">Bitrate</div>
                         <div class="stat-value" id="txBitrate">-</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-label">코덱</div>
+                        <div class="stat-label">Codec</div>
                         <div class="stat-value" id="txCodec">-</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-label">패킷 손실</div>
+                        <div class="stat-label">Packet Loss</div>
                         <div class="stat-value" id="txPacketLoss">-</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Network Type</div>
+                        <div class="stat-value" id="txNetworkType">-</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Transport</div>
+                        <div class="stat-value" id="txTransport">-</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Local IP</div>
+                        <div class="stat-value" id="txLocalIP">-</div>
                     </div>
                 </div>
 
                 <div class="chart-section">
-                    <div class="chart-title">실시간 성능 그래프</div>
+                    <div class="chart-title">Real-time Performance Metrics</div>
                     <div class="chart-container">
                         <canvas id="broadcasterChart"></canvas>
                     </div>
@@ -429,18 +449,18 @@
             <div id="broadcastStatus"></div>
         </div>
 
-        <!-- 시청 패널 -->
+        <!-- Viewer Panel -->
         <div id="viewer-panel" class="panel">
             <div class="info-box">
-                <strong>시청 모드:</strong> 송출자의 ID를 입력하여 스트림을 시청합니다.
+                <strong>Watch Mode:</strong> Enter broadcaster's ID to watch the stream.
             </div>
 
             <div class="input-group">
-                <label>송출자 ID 입력</label>
-                <input type="text" id="remotePeerId" placeholder="송출자가 공유한 ID를 입력하세요">
+                <label>Enter Broadcaster ID</label>
+                <input type="text" id="remotePeerId" placeholder="Enter the shared ID from broadcaster">
             </div>
 
-            <button id="connectBtn" onclick="connectToStream()">연결하기</button>
+            <button id="connectBtn" onclick="connectToStream()">Connect</button>
 
             <div id="remoteVideoContainer" style="display: none;">
                 <div class="video-container">
@@ -449,33 +469,45 @@
 
                 <div class="stats">
                     <div class="stat-item">
-                        <div class="stat-label">해상도</div>
+                        <div class="stat-label">Resolution</div>
                         <div class="stat-value" id="rxResolution">-</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-label">프레임레이트</div>
+                        <div class="stat-label">Frame Rate</div>
                         <div class="stat-value" id="rxFps">-</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-label">비트레이트</div>
+                        <div class="stat-label">Bitrate</div>
                         <div class="stat-value" id="rxBitrate">-</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-label">레이턴시</div>
+                        <div class="stat-label">Latency (RTT)</div>
                         <div class="stat-value" id="rxLatency">-</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-label">지터</div>
+                        <div class="stat-label">Jitter</div>
                         <div class="stat-value" id="rxJitter">-</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-label">패킷 손실</div>
+                        <div class="stat-label">Packet Loss</div>
                         <div class="stat-value" id="rxPacketLoss">-</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Network Type</div>
+                        <div class="stat-value" id="rxNetworkType">-</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Transport</div>
+                        <div class="stat-value" id="rxTransport">-</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Remote IP</div>
+                        <div class="stat-value" id="rxRemoteIP">-</div>
                     </div>
                 </div>
 
                 <div class="chart-section">
-                    <div class="chart-title">실시간 성능 그래프</div>
+                    <div class="chart-title">Real-time Performance Metrics</div>
                     <div class="chart-container">
                         <canvas id="viewerChart"></canvas>
                     </div>
@@ -827,6 +859,19 @@
                             document.getElementById('txPacketLoss').textContent = `${currentPacketLoss}%`;
                         }
                     }
+
+                    // ICE candidate pair (네트워크 정보)
+                    if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+                        // Local candidate
+                        const localCandidateId = report.localCandidateId;
+                        stats.forEach(r => {
+                            if (r.id === localCandidateId && r.type === 'local-candidate') {
+                                document.getElementById('txLocalIP').textContent = r.address || r.ip || '-';
+                                document.getElementById('txNetworkType').textContent = r.networkType || r.candidateType || '-';
+                                document.getElementById('txTransport').textContent = r.protocol ? r.protocol.toUpperCase() : '-';
+                            }
+                        });
+                    }
                 });
 
                 // 그래프 업데이트
@@ -834,7 +879,7 @@
 
                 lastStatsTime = now;
             } catch (err) {
-                console.error('통계 업데이트 실패:', err);
+                console.error('Stats update failed:', err);
             }
         }
 
@@ -902,6 +947,16 @@
                             currentLatency = Math.round(report.currentRoundTripTime * 1000);
                             document.getElementById('rxLatency').textContent = `${currentLatency} ms`;
                         }
+
+                        // Remote candidate (broadcaster's IP)
+                        const remoteCandidateId = report.remoteCandidateId;
+                        stats.forEach(r => {
+                            if (r.id === remoteCandidateId && r.type === 'remote-candidate') {
+                                document.getElementById('rxRemoteIP').textContent = r.address || r.ip || '-';
+                                document.getElementById('rxNetworkType').textContent = r.networkType || r.candidateType || '-';
+                                document.getElementById('rxTransport').textContent = r.protocol ? r.protocol.toUpperCase() : '-';
+                            }
+                        });
                     }
                 });
 
@@ -910,7 +965,7 @@
 
                 lastStatsTime = now;
             } catch (err) {
-                console.error('통계 업데이트 실패:', err);
+                console.error('Stats update failed:', err);
             }
         }
 
@@ -1000,7 +1055,7 @@
         // 송출 시작
         async function startBroadcast() {
             try {
-                showStatus('broadcastStatus', '웹캠 접근 중...', 'info');
+                showStatus('broadcastStatus', 'Accessing webcam...', 'info');
 
                 // 선택한 해상도 가져오기
                 const selectedResolution = document.getElementById('resolutionSelect').value;
@@ -1021,13 +1076,18 @@
                 document.getElementById('broadcastInfo').style.display = 'block';
                 document.getElementById('startBroadcast').style.display = 'none';
 
+                // Connection mode 확인
+                const connectionMode = document.getElementById('connectionMode').value;
+                const iceServers = connectionMode === 'lan' ? [] : [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ];
+
                 // Peer 초기화
                 peer = new Peer({
                     config: {
-                        iceServers: [
-                            { urls: 'stun:stun.l.google.com:19302' },
-                            { urls: 'stun:stun1.l.google.com:19302' }
-                        ]
+                        iceServers: iceServers,
+                        iceTransportPolicy: connectionMode === 'lan' ? 'all' : 'all'
                     }
                 });
 
@@ -1051,7 +1111,7 @@
                         correctLevel: QRCode.CorrectLevel.H
                     });
 
-                    showStatus('broadcastStatus', '송출 준비 완료! ID를 공유하세요.', 'success');
+                    showStatus('broadcastStatus', 'Broadcast ready! Share your ID.', 'success');
                 });
 
                 peer.on('call', (call) => {
@@ -1075,15 +1135,15 @@
                         }
                     });
 
-                    showStatus('broadcastStatus', '시청자가 연결되었습니다!', 'success');
+                    showStatus('broadcastStatus', 'Viewer connected!', 'success');
                 });
 
                 peer.on('error', (err) => {
-                    showStatus('broadcastStatus', '오류: ' + err.message, 'error');
+                    showStatus('broadcastStatus', 'Error: ' + err.message, 'error');
                 });
 
             } catch (err) {
-                showStatus('broadcastStatus', '웹캠 접근 실패: ' + err.message, 'error');
+                showStatus('broadcastStatus', 'Webcam access failed: ' + err.message, 'error');
             }
         }
 
@@ -1092,12 +1152,12 @@
             const remotePeerId = document.getElementById('remotePeerId').value.trim();
 
             if (!remotePeerId) {
-                showStatus('viewerStatus', 'ID를 입력하세요', 'error');
+                showStatus('viewerStatus', 'Please enter ID', 'error');
                 return;
             }
 
             try {
-                showStatus('viewerStatus', '연결 중...', 'info');
+                showStatus('viewerStatus', 'Connecting...', 'info');
                 document.getElementById('connectBtn').disabled = true;
 
                 // 더미 스트림 생성 (WebRTC 연결을 위해 필요)
@@ -1132,10 +1192,10 @@
                     currentCall = peer.call(remotePeerId, dummyStream);
 
                     currentCall.on('stream', (remoteStream) => {
-                        console.log('스트림 수신됨:', remoteStream);
+                        console.log('Stream received:', remoteStream);
                         document.getElementById('remoteVideo').srcObject = remoteStream;
                         document.getElementById('remoteVideoContainer').style.display = 'block';
-                        showStatus('viewerStatus', '스트림 수신 중!', 'success');
+                        showStatus('viewerStatus', 'Streaming!', 'success');
                         document.getElementById('connectBtn').disabled = false;
 
                         // 통계 모니터링 시작
@@ -1143,7 +1203,7 @@
                     });
 
                     currentCall.on('close', () => {
-                        showStatus('viewerStatus', '연결이 종료되었습니다', 'error');
+                        showStatus('viewerStatus', 'Connection closed', 'error');
                         document.getElementById('remoteVideoContainer').style.display = 'none';
                         document.getElementById('connectBtn').disabled = false;
 
@@ -1152,8 +1212,8 @@
                     });
 
                     currentCall.on('error', (err) => {
-                        console.error('Call 오류:', err);
-                        showStatus('viewerStatus', '연결 오류: ' + err.message, 'error');
+                        console.error('Call Error:', err);
+                        showStatus('viewerStatus', '연결 Error: ' + err.message, 'error');
                         document.getElementById('connectBtn').disabled = false;
 
                         // 통계 모니터링 중지
@@ -1162,14 +1222,14 @@
                 });
 
                 peer.on('error', (err) => {
-                    console.error('Peer 오류:', err);
-                    showStatus('viewerStatus', '오류: ' + err.message, 'error');
+                    console.error('Peer Error:', err);
+                    showStatus('viewerStatus', 'Error: ' + err.message, 'error');
                     document.getElementById('connectBtn').disabled = false;
                 });
 
             } catch (err) {
-                console.error('연결 실패:', err);
-                showStatus('viewerStatus', '연결 실패: ' + err.message, 'error');
+                console.error('Connection failed:', err);
+                showStatus('viewerStatus', 'Connection failed: ' + err.message, 'error');
                 document.getElementById('connectBtn').disabled = false;
             }
         }
@@ -1182,7 +1242,7 @@
 
             const btn = event.target;
             const originalText = btn.textContent;
-            btn.textContent = '✓ 복사됨';
+            btn.textContent = '✓ Copied';
             setTimeout(() => {
                 btn.textContent = originalText;
             }, 2000);
