@@ -284,6 +284,50 @@
             color: #86868b;
         }
 
+        .quality-selector {
+            margin-bottom: 20px;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #d2d2d7;
+            border-radius: 10px;
+            font-size: 1em;
+            background: #ffffff;
+            color: #1d1d1f;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #007AFF;
+            box-shadow: 0 0 0 3px rgba(0,122,255,0.1);
+        }
+
+        .chart-section {
+            margin-top: 32px;
+            padding-top: 32px;
+            border-top: 1px solid #d2d2d7;
+        }
+
+        .chart-title {
+            font-size: 1.1em;
+            color: #1d1d1f;
+            font-weight: 600;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 250px;
+            background: #f5f5f7;
+            border-radius: 12px;
+            padding: 16px;
+        }
+
         @media (max-width: 600px) {
             .container {
                 padding: 24px;
@@ -313,6 +357,17 @@
         <div id="broadcast-panel" class="panel active">
             <div class="info-box">
                 <strong>송출 모드:</strong> 내 웹캠을 다른 사람에게 공유합니다.
+            </div>
+
+            <div class="quality-selector">
+                <label>해상도 설정</label>
+                <select id="resolutionSelect">
+                    <option value="640x480">SD - 640x480</option>
+                    <option value="1280x720" selected>HD - 1280x720</option>
+                    <option value="1920x1080">Full HD - 1920x1080</option>
+                    <option value="2560x1440">2K - 2560x1440</option>
+                    <option value="3840x2160">4K - 3840x2160</option>
+                </select>
             </div>
 
             <button id="startBroadcast" onclick="startBroadcast()">웹캠 시작</button>
@@ -360,6 +415,13 @@
                     <div class="stat-item">
                         <div class="stat-label">패킷 손실</div>
                         <div class="stat-value" id="txPacketLoss">-</div>
+                    </div>
+                </div>
+
+                <div class="chart-section">
+                    <div class="chart-title">실시간 성능 그래프</div>
+                    <div class="chart-container">
+                        <canvas id="broadcasterChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -411,6 +473,13 @@
                         <div class="stat-value" id="rxPacketLoss">-</div>
                     </div>
                 </div>
+
+                <div class="chart-section">
+                    <div class="chart-title">실시간 성능 그래프</div>
+                    <div class="chart-container">
+                        <canvas id="viewerChart"></canvas>
+                    </div>
+                </div>
             </div>
 
             <div id="viewerStatus"></div>
@@ -421,6 +490,8 @@
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <!-- QRCode.js CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
     <script>
         let peer = null;
@@ -432,6 +503,273 @@
         let lastBytesSent = 0;
         let lastBytesReceived = 0;
         let lastStatsTime = 0;
+
+        // Chart.js 인스턴스
+        let broadcasterChart = null;
+        let viewerChart = null;
+
+        // 그래프 데이터 (최근 30개 유지)
+        const maxDataPoints = 30;
+        const chartData = {
+            broadcaster: {
+                labels: [],
+                fps: [],
+                bitrate: [],
+                packetLoss: []
+            },
+            viewer: {
+                labels: [],
+                fps: [],
+                bitrate: [],
+                latency: [],
+                packetLoss: []
+            }
+        };
+
+        // 송출자 그래프 초기화
+        function initBroadcasterChart() {
+            const ctx = document.getElementById('broadcasterChart').getContext('2d');
+            broadcasterChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'FPS',
+                            data: [],
+                            borderColor: '#007AFF',
+                            backgroundColor: 'rgba(0, 122, 255, 0.1)',
+                            tension: 0.4,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: '비트레이트 (kbps)',
+                            data: [],
+                            borderColor: '#34C759',
+                            backgroundColor: 'rgba(52, 199, 89, 0.1)',
+                            tension: 0.4,
+                            yAxisID: 'y1'
+                        },
+                        {
+                            label: '패킷 손실 (%)',
+                            data: [],
+                            borderColor: '#FF3B30',
+                            backgroundColor: 'rgba(255, 59, 48, 0.1)',
+                            tension: 0.4,
+                            yAxisID: 'y2'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'FPS'
+                            },
+                            min: 0,
+                            max: 60
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Bitrate (kbps)'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            },
+                            min: 0
+                        },
+                        y2: {
+                            type: 'linear',
+                            display: false,
+                            min: 0,
+                            max: 10
+                        }
+                    }
+                }
+            });
+        }
+
+        // 시청자 그래프 초기화
+        function initViewerChart() {
+            const ctx = document.getElementById('viewerChart').getContext('2d');
+            viewerChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'FPS',
+                            data: [],
+                            borderColor: '#007AFF',
+                            backgroundColor: 'rgba(0, 122, 255, 0.1)',
+                            tension: 0.4,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: '비트레이트 (kbps)',
+                            data: [],
+                            borderColor: '#34C759',
+                            backgroundColor: 'rgba(52, 199, 89, 0.1)',
+                            tension: 0.4,
+                            yAxisID: 'y1'
+                        },
+                        {
+                            label: '레이턴시 (ms)',
+                            data: [],
+                            borderColor: '#FF9500',
+                            backgroundColor: 'rgba(255, 149, 0, 0.1)',
+                            tension: 0.4,
+                            yAxisID: 'y2'
+                        },
+                        {
+                            label: '패킷 손실 (%)',
+                            data: [],
+                            borderColor: '#FF3B30',
+                            backgroundColor: 'rgba(255, 59, 48, 0.1)',
+                            tension: 0.4,
+                            yAxisID: 'y3'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'FPS'
+                            },
+                            min: 0,
+                            max: 60
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Bitrate (kbps)'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            },
+                            min: 0
+                        },
+                        y2: {
+                            type: 'linear',
+                            display: false,
+                            min: 0,
+                            max: 500
+                        },
+                        y3: {
+                            type: 'linear',
+                            display: false,
+                            min: 0,
+                            max: 10
+                        }
+                    }
+                }
+            });
+        }
+
+        // 그래프 데이터 업데이트
+        function updateChartData(isBroadcaster, fps, bitrate, latency, packetLoss) {
+            const now = new Date().toLocaleTimeString();
+            const data = isBroadcaster ? chartData.broadcaster : chartData.viewer;
+            const chart = isBroadcaster ? broadcasterChart : viewerChart;
+
+            // 레이블 추가
+            data.labels.push(now);
+            if (data.labels.length > maxDataPoints) {
+                data.labels.shift();
+            }
+
+            // FPS 데이터
+            data.fps.push(fps || 0);
+            if (data.fps.length > maxDataPoints) {
+                data.fps.shift();
+            }
+
+            // 비트레이트 데이터
+            data.bitrate.push(bitrate || 0);
+            if (data.bitrate.length > maxDataPoints) {
+                data.bitrate.shift();
+            }
+
+            // 레이턴시 (시청자만)
+            if (!isBroadcaster) {
+                data.latency.push(latency || 0);
+                if (data.latency.length > maxDataPoints) {
+                    data.latency.shift();
+                }
+            }
+
+            // 패킷 손실
+            data.packetLoss.push(packetLoss || 0);
+            if (data.packetLoss.length > maxDataPoints) {
+                data.packetLoss.shift();
+            }
+
+            // 차트 업데이트
+            if (chart) {
+                chart.data.labels = data.labels;
+                chart.data.datasets[0].data = data.fps;
+                chart.data.datasets[1].data = data.bitrate;
+                if (isBroadcaster) {
+                    chart.data.datasets[2].data = data.packetLoss;
+                } else {
+                    chart.data.datasets[2].data = data.latency;
+                    chart.data.datasets[3].data = data.packetLoss;
+                }
+                chart.update('none'); // 애니메이션 없이 업데이트
+            }
+        }
 
         // 송출자 통계 업데이트
         async function updateBroadcasterStats() {
@@ -445,6 +783,10 @@
                 const stats = await conn.peerConnection.getStats();
                 const now = Date.now();
 
+                let currentFps = 0;
+                let currentBitrate = 0;
+                let currentPacketLoss = 0;
+
                 stats.forEach(report => {
                     // 송신 비디오 트랙 정보
                     if (report.type === 'outbound-rtp' && report.kind === 'video') {
@@ -456,17 +798,16 @@
 
                         // 프레임레이트
                         if (report.framesPerSecond) {
-                            document.getElementById('txFps').textContent =
-                                `${Math.round(report.framesPerSecond)} fps`;
+                            currentFps = Math.round(report.framesPerSecond);
+                            document.getElementById('txFps').textContent = `${currentFps} fps`;
                         }
 
                         // 비트레이트 계산
                         if (report.bytesSent && lastBytesSent > 0 && lastStatsTime > 0) {
                             const bytesDiff = report.bytesSent - lastBytesSent;
                             const timeDiff = (now - lastStatsTime) / 1000;
-                            const bitrate = (bytesDiff * 8) / timeDiff / 1000; // kbps
-                            document.getElementById('txBitrate').textContent =
-                                `${Math.round(bitrate)} kbps`;
+                            currentBitrate = Math.round((bytesDiff * 8) / timeDiff / 1000); // kbps
+                            document.getElementById('txBitrate').textContent = `${currentBitrate} kbps`;
                         }
                         lastBytesSent = report.bytesSent;
                     }
@@ -482,11 +823,14 @@
                         if (report.packetsLost !== undefined && report.packetsReceived !== undefined) {
                             const total = report.packetsLost + report.packetsReceived;
                             const lossRate = total > 0 ? (report.packetsLost / total * 100) : 0;
-                            document.getElementById('txPacketLoss').textContent =
-                                `${lossRate.toFixed(2)}%`;
+                            currentPacketLoss = parseFloat(lossRate.toFixed(2));
+                            document.getElementById('txPacketLoss').textContent = `${currentPacketLoss}%`;
                         }
                     }
                 });
+
+                // 그래프 업데이트
+                updateChartData(true, currentFps, currentBitrate, 0, currentPacketLoss);
 
                 lastStatsTime = now;
             } catch (err) {
@@ -502,6 +846,11 @@
                 const stats = await currentCall.peerConnection.getStats();
                 const now = Date.now();
 
+                let currentFps = 0;
+                let currentBitrate = 0;
+                let currentLatency = 0;
+                let currentPacketLoss = 0;
+
                 stats.forEach(report => {
                     // 수신 비디오 트랙 정보
                     if (report.type === 'inbound-rtp' && report.kind === 'video') {
@@ -513,17 +862,16 @@
 
                         // 프레임레이트
                         if (report.framesPerSecond) {
-                            document.getElementById('rxFps').textContent =
-                                `${Math.round(report.framesPerSecond)} fps`;
+                            currentFps = Math.round(report.framesPerSecond);
+                            document.getElementById('rxFps').textContent = `${currentFps} fps`;
                         }
 
                         // 비트레이트 계산
                         if (report.bytesReceived && lastBytesReceived > 0 && lastStatsTime > 0) {
                             const bytesDiff = report.bytesReceived - lastBytesReceived;
                             const timeDiff = (now - lastStatsTime) / 1000;
-                            const bitrate = (bytesDiff * 8) / timeDiff / 1000; // kbps
-                            document.getElementById('rxBitrate').textContent =
-                                `${Math.round(bitrate)} kbps`;
+                            currentBitrate = Math.round((bytesDiff * 8) / timeDiff / 1000); // kbps
+                            document.getElementById('rxBitrate').textContent = `${currentBitrate} kbps`;
                         }
                         lastBytesReceived = report.bytesReceived;
 
@@ -537,26 +885,28 @@
                         if (report.packetsLost !== undefined && report.packetsReceived !== undefined) {
                             const total = report.packetsLost + report.packetsReceived;
                             const lossRate = total > 0 ? (report.packetsLost / total * 100) : 0;
-                            document.getElementById('rxPacketLoss').textContent =
-                                `${lossRate.toFixed(2)}%`;
+                            currentPacketLoss = parseFloat(lossRate.toFixed(2));
+                            document.getElementById('rxPacketLoss').textContent = `${currentPacketLoss}%`;
                         }
 
                         // 레이턴시 (jitterBufferDelay)
                         if (report.jitterBufferDelay !== undefined && report.jitterBufferEmittedCount > 0) {
-                            const latency = (report.jitterBufferDelay / report.jitterBufferEmittedCount) * 1000;
-                            document.getElementById('rxLatency').textContent =
-                                `${Math.round(latency)} ms`;
+                            currentLatency = Math.round((report.jitterBufferDelay / report.jitterBufferEmittedCount) * 1000);
+                            document.getElementById('rxLatency').textContent = `${currentLatency} ms`;
                         }
                     }
 
                     // ICE 후보 쌍에서 RTT (Round Trip Time) 가져오기
                     if (report.type === 'candidate-pair' && report.state === 'succeeded') {
                         if (report.currentRoundTripTime !== undefined) {
-                            document.getElementById('rxLatency').textContent =
-                                `${Math.round(report.currentRoundTripTime * 1000)} ms`;
+                            currentLatency = Math.round(report.currentRoundTripTime * 1000);
+                            document.getElementById('rxLatency').textContent = `${currentLatency} ms`;
                         }
                     }
                 });
+
+                // 그래프 업데이트
+                updateChartData(false, currentFps, currentBitrate, currentLatency, currentPacketLoss);
 
                 lastStatsTime = now;
             } catch (err) {
@@ -569,6 +919,17 @@
             // 기존 인터벌 정리
             if (statsInterval) {
                 clearInterval(statsInterval);
+            }
+
+            // 그래프 초기화
+            if (isBroadcaster) {
+                if (!broadcasterChart) {
+                    initBroadcasterChart();
+                }
+            } else {
+                if (!viewerChart) {
+                    initViewerChart();
+                }
             }
 
             // 1초마다 통계 업데이트
@@ -590,6 +951,17 @@
             lastBytesSent = 0;
             lastBytesReceived = 0;
             lastStatsTime = 0;
+
+            // 그래프 데이터 초기화
+            chartData.broadcaster.labels = [];
+            chartData.broadcaster.fps = [];
+            chartData.broadcaster.bitrate = [];
+            chartData.broadcaster.packetLoss = [];
+            chartData.viewer.labels = [];
+            chartData.viewer.fps = [];
+            chartData.viewer.bitrate = [];
+            chartData.viewer.latency = [];
+            chartData.viewer.packetLoss = [];
         }
 
         // 페이지 로드 시 URL 파라미터 체크
@@ -630,11 +1002,15 @@
             try {
                 showStatus('broadcastStatus', '웹캠 접근 중...', 'info');
 
+                // 선택한 해상도 가져오기
+                const selectedResolution = document.getElementById('resolutionSelect').value;
+                const [width, height] = selectedResolution.split('x').map(Number);
+
                 // 웹캠 스트림 획득
                 localStream = await navigator.mediaDevices.getUserMedia({
                     video: {
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
+                        width: { ideal: width },
+                        height: { ideal: height },
                         frameRate: { ideal: 30 }
                     },
                     audio: true
