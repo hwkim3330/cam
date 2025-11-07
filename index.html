@@ -254,6 +254,36 @@
             transform: scale(0.95);
         }
 
+        .qr-section {
+            margin-top: 24px;
+            text-align: center;
+        }
+
+        .qr-title {
+            font-size: 0.95em;
+            color: #1d1d1f;
+            font-weight: 500;
+            margin-bottom: 12px;
+        }
+
+        #qrcode {
+            display: inline-block;
+            padding: 16px;
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        #qrcode canvas {
+            border-radius: 8px;
+        }
+
+        .qr-instruction {
+            margin-top: 12px;
+            font-size: 0.85em;
+            color: #86868b;
+        }
+
         @media (max-width: 600px) {
             .container {
                 padding: 24px;
@@ -294,6 +324,12 @@
                         <input type="text" id="myPeerId" readonly>
                         <button class="copy-btn" onclick="copyPeerId()">복사</button>
                     </div>
+                </div>
+
+                <div class="qr-section">
+                    <div class="qr-title">QR 코드로 공유</div>
+                    <div id="qrcode"></div>
+                    <div class="qr-instruction">스마트폰으로 스캔하면 바로 시청 시작</div>
                 </div>
 
                 <div class="video-container">
@@ -351,12 +387,31 @@
 
     <!-- PeerJS CDN -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- QRCode.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
     <script>
         let peer = null;
         let localStream = null;
         let currentCall = null;
+        let qrCodeInstance = null;
         const connections = new Set();
+
+        // 페이지 로드 시 URL 파라미터 체크
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const peerId = urlParams.get('id');
+
+            if (peerId) {
+                // QR 코드로 접속한 경우 자동으로 시청 모드로 전환
+                setMode('viewer');
+                document.getElementById('remotePeerId').value = peerId;
+                // 1초 후 자동 연결 (페이지 로딩 완료 대기)
+                setTimeout(() => {
+                    connectToStream();
+                }, 1000);
+            }
+        });
 
         // 모드 전환
         function setMode(mode) {
@@ -407,6 +462,24 @@
 
                 peer.on('open', (id) => {
                     document.getElementById('myPeerId').value = id;
+
+                    // QR 코드 생성
+                    const qrUrl = `https://hwkim3330.github.io/cam/?id=${id}`;
+                    const qrContainer = document.getElementById('qrcode');
+
+                    // 기존 QR 코드 제거
+                    qrContainer.innerHTML = '';
+
+                    // 새 QR 코드 생성
+                    qrCodeInstance = new QRCode(qrContainer, {
+                        text: qrUrl,
+                        width: 200,
+                        height: 200,
+                        colorDark: "#1d1d1f",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.H
+                    });
+
                     showStatus('broadcastStatus', '송출 준비 완료! ID를 공유하세요.', 'success');
                 });
 
@@ -552,6 +625,13 @@
                 currentCall = null;
             }
             connections.clear();
+
+            // QR 코드 초기화
+            const qrContainer = document.getElementById('qrcode');
+            if (qrContainer) {
+                qrContainer.innerHTML = '';
+            }
+            qrCodeInstance = null;
         }
 
         // 페이지 종료 시 정리
