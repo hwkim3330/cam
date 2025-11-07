@@ -15,7 +15,9 @@ Ultra-low latency P2P video streaming solution using WebRTC technology. Stream y
 - **Multi-codec Support**: VP8, VP9, H.264 hardware acceleration
 
 ### 🌐 Network Modes
-- **P2P Mode**: Internet streaming with STUN/TURN servers
+- **Manual Signaling (Default)**: Copy-paste SDP exchange - 100% stable, no server dependency
+- **PeerJS Auto**: Automatic signaling via PeerJS server (may be unstable)
+- **P2P Mode**: Internet streaming with STUN servers
 - **LAN-Only Mode**: Direct local network connection (like GStreamer)
 - **Auto NAT Traversal**: Works behind routers and firewalls
 
@@ -39,33 +41,94 @@ Ultra-low latency P2P video streaming solution using WebRTC technology. Stream y
 
 ## 🚀 Quick Start
 
-### Broadcaster (Webcam Owner)
+### Option 1: Manual Signaling (Recommended - 100% Stable)
+
+#### Broadcaster (Webcam Owner)
 1. Open https://hwkim3330.github.io/cam/
 2. Select **Broadcast** mode
 3. Choose resolution (recommended: Full HD 1920x1080)
-4. Select connection mode:
-   - **P2P**: For internet streaming
-   - **LAN Only**: For local network only
+4. Keep **Manual (Copy-Paste - 100% stable)** selected
+5. Click "Start Webcam"
+6. **Copy the Offer** text and send to viewer (via chat, email, etc.)
+7. **Paste the Answer** from viewer and click "Connect to Viewer"
+
+#### Viewer (Watching)
+1. Open https://hwkim3330.github.io/cam/
+2. Select **Watch** mode
+3. Keep **Manual (Copy-Paste - 100% stable)** selected
+4. **Paste broadcaster's Offer** and click "Generate Answer"
+5. **Copy the Answer** and send back to broadcaster
+6. Stream starts automatically when broadcaster pastes your answer!
+
+### Option 2: PeerJS Auto (May be unstable)
+
+#### Broadcaster (Webcam Owner)
+1. Open https://hwkim3330.github.io/cam/
+2. Select **Broadcast** mode
+3. Choose **PeerJS (Auto - may be unstable)** signaling
+4. Choose resolution (recommended: Full HD 1920x1080)
 5. Click "Start Webcam"
 6. Share the generated ID or QR code with viewers
 
-### Viewer (Watching)
+#### Viewer (Watching)
 1. Open https://hwkim3330.github.io/cam/
 2. Select **Watch** mode
-3. Enter the broadcaster's ID
-4. Click "Connect"
-5. Start watching the live stream!
+3. Choose **PeerJS (Auto - may be unstable)** signaling
+4. Enter the broadcaster's ID
+5. Click "Connect"
+6. Start watching the live stream!
 
-**Or** scan the QR code with your smartphone to auto-connect.
+**Or** scan the QR code with your smartphone to auto-connect (PeerJS mode only).
 
 ## 🛠️ Technical Details
 
 ### Technology Stack
 - **WebRTC**: Peer-to-peer real-time communication
-- **PeerJS**: WebRTC abstraction library
+- **Native RTCPeerConnection**: Manual signaling mode (default)
+- **PeerJS**: WebRTC abstraction library (optional)
 - **Chart.js**: Real-time performance charts
 - **QRCode.js**: QR code generation
 - **Vanilla JavaScript**: No framework dependencies
+
+### Signaling Methods
+
+#### Manual Signaling (Default & Recommended)
+**How it works:**
+- Broadcaster creates SDP offer + ICE candidates bundle
+- Offer sent to viewer via any channel (chat, email, Discord, etc.)
+- Viewer generates SDP answer + ICE candidates bundle
+- Answer sent back to broadcaster
+- Direct P2P connection established
+
+**Advantages:**
+- ✅ **100% Reliable**: No server dependency
+- ✅ **Zero Downtime**: Cannot fail due to server issues
+- ✅ **Privacy First**: No third-party tracking
+- ✅ **Firewall Friendly**: Works in restricted networks
+- ✅ **Enterprise Ready**: No external service dependencies
+- ✅ **Offline Setup**: Exchange offers/answers on USB, paper, etc.
+
+**Use Cases:**
+- Production environments requiring reliability
+- High-security environments
+- Networks blocking WebSocket/signaling servers
+- When you have existing communication channels
+
+#### PeerJS Auto Signaling (Optional)
+**How it works:**
+- Uses PeerJS free server (0.peerjs.com) for WebSocket signaling
+- Generates unique peer ID
+- QR code for easy mobile connection
+
+**Advantages:**
+- 🚀 Quick setup with ID sharing
+- 📱 QR code for mobile devices
+- 🔗 URL-based auto-connect
+
+**Disadvantages:**
+- ⚠️ Server dependency (may be unstable)
+- ⚠️ Requires WebSocket connection
+- ⚠️ Third-party service reliability
 
 ### Network Architecture
 ```
@@ -163,6 +226,8 @@ If connection fails:
 - Verify webcam is not used by another application
 - Try different browser
 - Check F12 console for errors
+- **Manual mode**: Ensure offer/answer exchange was completed
+- **PeerJS mode**: Try switching to Manual signaling mode
 
 ### High Latency
 - Switch to LAN-only mode if on same network
@@ -170,11 +235,24 @@ If connection fails:
 - Reduce resolution
 - Close bandwidth-heavy applications
 
-### Connection Failed
+### Connection Failed (PeerJS Mode)
+- **RECOMMENDED**: Switch to **Manual Signaling mode** for 100% reliability
 - Verify both sides have internet access (P2P mode)
 - Check firewall settings
 - Try LAN-only mode for local networks
 - Ensure correct ID is entered
+- Try custom PeerJS server
+
+### Manual Signaling Tips
+- ✅ Copy the **entire** offer/answer text (don't miss any characters)
+- ✅ Use proper messaging apps (avoid SMS which may truncate long text)
+- ✅ Send as plain text (not as formatted/rich text)
+- ✅ Wait for "Answer generated!" message before copying
+- ✅ Both sides must paste and click buttons in correct order
+
+### WebSocket/Server Errors
+- These only affect PeerJS mode
+- **Solution**: Switch to Manual Signaling mode (no server required)
 
 ## 📝 License
 
