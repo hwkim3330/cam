@@ -372,6 +372,14 @@
             </div>
 
             <div class="quality-selector">
+                <label>Signaling Method</label>
+                <select id="signalingMode" onchange="updateSignalingUI()">
+                    <option value="peerjs">PeerJS (Auto - may be unstable)</option>
+                    <option value="manual" selected>Manual (Copy-Paste - 100% stable)</option>
+                </select>
+            </div>
+
+            <div class="quality-selector">
                 <label>Connection Mode</label>
                 <select id="connectionMode">
                     <option value="p2p" selected>P2P (Internet - uses STUN)</option>
@@ -391,7 +399,7 @@
                 </select>
             </div>
 
-            <div class="quality-selector">
+            <div id="peerjsOptions" class="quality-selector" style="display: none;">
                 <label>PeerJS Server (for stability)</label>
                 <input type="text" id="peerServer" placeholder="Leave empty for default (0.peerjs.com)" style="margin-bottom: 5px;">
                 <small style="color: #86868b; font-size: 0.85em;">Custom server: your-server.com (no https://)</small>
@@ -399,8 +407,29 @@
 
             <button id="startBroadcast" onclick="startBroadcast()">Start Webcam</button>
 
-            <div id="broadcastInfo" style="display: none;">
+            <!-- Manual Signaling UI for Broadcaster -->
+            <div id="manualBroadcastUI" style="display: none; margin-top: 20px;">
+                <div class="info-box">
+                    <strong>Step 1:</strong> Start webcam above<br>
+                    <strong>Step 2:</strong> Copy "Offer" below and send to viewer<br>
+                    <strong>Step 3:</strong> Paste viewer's "Answer" in the box below
+                </div>
+
                 <div class="input-group">
+                    <label>Offer (Copy and send to viewer)</label>
+                    <textarea id="manualOffer" readonly style="width: 100%; height: 100px; padding: 12px; border: 1px solid #d2d2d7; border-radius: 10px; font-family: monospace; font-size: 0.85em;"></textarea>
+                    <button class="copy-btn" style="width: 100%; margin-top: 5px;" onclick="copyText('manualOffer')">Copy Offer</button>
+                </div>
+
+                <div class="input-group">
+                    <label>Answer (Paste from viewer)</label>
+                    <textarea id="manualAnswer" placeholder="Paste viewer's answer here..." style="width: 100%; height: 100px; padding: 12px; border: 1px solid #d2d2d7; border-radius: 10px; font-family: monospace; font-size: 0.85em;"></textarea>
+                    <button onclick="setRemoteAnswer()" style="width: 100%; margin-top: 5px;">Connect to Viewer</button>
+                </div>
+            </div>
+
+            <div id="broadcastInfo" style="display: none;">
+                <div id="peerjsInfo" class="input-group">
                     <label>Share ID (Send this to viewers)</label>
                     <div style="display: flex; gap: 10px;">
                         <input type="text" id="myPeerId" readonly>
@@ -408,7 +437,7 @@
                     </div>
                 </div>
 
-                <div class="qr-section">
+                <div id="peerjsQR" class="qr-section">
                     <div class="qr-title">Share via QR Code</div>
                     <div id="qrcode"></div>
                     <div class="qr-instruction">Scan with smartphone to start watching</div>
@@ -471,15 +500,47 @@
         <!-- Viewer Panel -->
         <div id="viewer-panel" class="panel">
             <div class="info-box">
-                <strong>Watch Mode:</strong> Enter broadcaster's ID to watch the stream.
+                <strong>Watch Mode:</strong> Connect to broadcaster's stream.
             </div>
 
-            <div class="input-group">
-                <label>Enter Broadcaster ID</label>
-                <input type="text" id="remotePeerId" placeholder="Enter the shared ID from broadcaster">
+            <div class="quality-selector">
+                <label>Signaling Method</label>
+                <select id="viewerSignalingMode" onchange="updateViewerSignalingUI()">
+                    <option value="peerjs">PeerJS (Auto - may be unstable)</option>
+                    <option value="manual" selected>Manual (Copy-Paste - 100% stable)</option>
+                </select>
             </div>
 
-            <button id="connectBtn" onclick="connectToStream()">Connect</button>
+            <!-- PeerJS Mode -->
+            <div id="peerjsViewerUI">
+                <div class="input-group">
+                    <label>Enter Broadcaster ID</label>
+                    <input type="text" id="remotePeerId" placeholder="Enter the shared ID from broadcaster">
+                </div>
+
+                <button id="connectBtn" onclick="connectToStream()">Connect</button>
+            </div>
+
+            <!-- Manual Mode -->
+            <div id="manualViewerUI" style="display: none;">
+                <div class="info-box">
+                    <strong>Step 1:</strong> Paste broadcaster's "Offer" below<br>
+                    <strong>Step 2:</strong> Click "Generate Answer"<br>
+                    <strong>Step 3:</strong> Copy "Answer" and send back to broadcaster
+                </div>
+
+                <div class="input-group">
+                    <label>Offer (Paste from broadcaster)</label>
+                    <textarea id="viewerOffer" placeholder="Paste broadcaster's offer here..." style="width: 100%; height: 100px; padding: 12px; border: 1px solid #d2d2d7; border-radius: 10px; font-family: monospace; font-size: 0.85em;"></textarea>
+                    <button onclick="generateAnswer()" style="width: 100%; margin-top: 5px;">Generate Answer</button>
+                </div>
+
+                <div class="input-group">
+                    <label>Answer (Copy and send to broadcaster)</label>
+                    <textarea id="viewerAnswer" readonly style="width: 100%; height: 100px; padding: 12px; border: 1px solid #d2d2d7; border-radius: 10px; font-family: monospace; font-size: 0.85em;"></textarea>
+                    <button class="copy-btn" style="width: 100%; margin-top: 5px;" onclick="copyText('viewerAnswer')">Copy Answer</button>
+                </div>
+            </div>
 
             <div id="remoteVideoContainer" style="display: none;">
                 <div class="video-container">
@@ -554,6 +615,11 @@
         let lastBytesSent = 0;
         let lastBytesReceived = 0;
         let lastStatsTime = 0;
+
+        // Manual WebRTC variables
+        let manualPeerConnection = null;
+        let pendingIceCandidates = [];
+        let isManualMode = false;
 
         // Chart.js 인스턴스
         let broadcasterChart = null;
@@ -1062,8 +1128,270 @@
             chartData.viewer.packetLoss = [];
         }
 
+        // Signaling UI 업데이트 (Broadcaster)
+        function updateSignalingUI() {
+            const mode = document.getElementById('signalingMode').value;
+            isManualMode = (mode === 'manual');
+
+            if (isManualMode) {
+                document.getElementById('peerjsOptions').style.display = 'none';
+                document.getElementById('manualBroadcastUI').style.display = 'block';
+                // Hide PeerJS-specific info when in broadcast
+                if (document.getElementById('broadcastInfo').style.display !== 'none') {
+                    document.getElementById('peerjsInfo').style.display = 'none';
+                    document.getElementById('peerjsQR').style.display = 'none';
+                }
+            } else {
+                document.getElementById('peerjsOptions').style.display = 'block';
+                document.getElementById('manualBroadcastUI').style.display = 'none';
+                if (document.getElementById('broadcastInfo').style.display !== 'none') {
+                    document.getElementById('peerjsInfo').style.display = 'block';
+                    document.getElementById('peerjsQR').style.display = 'block';
+                }
+            }
+        }
+
+        // Signaling UI 업데이트 (Viewer)
+        function updateViewerSignalingUI() {
+            const mode = document.getElementById('viewerSignalingMode').value;
+
+            if (mode === 'manual') {
+                document.getElementById('peerjsViewerUI').style.display = 'none';
+                document.getElementById('manualViewerUI').style.display = 'block';
+            } else {
+                document.getElementById('peerjsViewerUI').style.display = 'block';
+                document.getElementById('manualViewerUI').style.display = 'none';
+            }
+        }
+
+        // 텍스트 복사 함수
+        function copyText(elementId) {
+            const element = document.getElementById(elementId);
+            element.select();
+            element.setSelectionRange(0, 99999); // Mobile support
+
+            // Determine which status to show based on element ID
+            const statusId = elementId.includes('viewer') || elementId === 'viewerAnswer' ? 'viewerStatus' : 'broadcastStatus';
+
+            try {
+                document.execCommand('copy');
+                showStatus(statusId, 'Copied to clipboard!', 'success');
+                setTimeout(() => showStatus(statusId, '', 'info'), 2000);
+            } catch (err) {
+                // Fallback to navigator.clipboard
+                navigator.clipboard.writeText(element.value).then(() => {
+                    showStatus(statusId, 'Copied to clipboard!', 'success');
+                    setTimeout(() => showStatus(statusId, '', 'info'), 2000);
+                }).catch(() => {
+                    showStatus(statusId, 'Failed to copy', 'error');
+                });
+            }
+        }
+
+        // Manual WebRTC: Broadcaster creates offer
+        async function createManualOffer() {
+            try {
+                // Connection mode 확인
+                const connectionMode = document.getElementById('connectionMode').value;
+                const iceServers = connectionMode === 'lan' ? [] : [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ];
+
+                const maxBitrate = parseInt(document.getElementById('bitrateLimit').value);
+
+                // Create peer connection
+                manualPeerConnection = new RTCPeerConnection({
+                    iceServers: iceServers
+                });
+
+                // Add local stream to peer connection
+                localStream.getTracks().forEach(track => {
+                    manualPeerConnection.addTrack(track, localStream);
+                });
+
+                // Apply bitrate limit
+                if (maxBitrate > 0) {
+                    const senders = manualPeerConnection.getSenders();
+                    senders.forEach(sender => {
+                        if (sender.track && sender.track.kind === 'video') {
+                            const parameters = sender.getParameters();
+                            if (!parameters.encodings) {
+                                parameters.encodings = [{}];
+                            }
+                            parameters.encodings[0].maxBitrate = maxBitrate * 1000;
+                            sender.setParameters(parameters).catch(e => console.log('Bitrate limit failed:', e));
+                        }
+                    });
+                }
+
+                // Collect ICE candidates
+                pendingIceCandidates = [];
+                manualPeerConnection.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        pendingIceCandidates.push(event.candidate);
+                    } else {
+                        // All ICE candidates collected, generate final offer
+                        const offer = {
+                            type: manualPeerConnection.localDescription.type,
+                            sdp: manualPeerConnection.localDescription.sdp,
+                            candidates: pendingIceCandidates
+                        };
+                        document.getElementById('manualOffer').value = JSON.stringify(offer);
+                        showStatus('broadcastStatus', 'Offer generated! Copy and send to viewer.', 'success');
+                    }
+                };
+
+                // Monitor connection state
+                manualPeerConnection.onconnectionstatechange = () => {
+                    console.log('Connection state:', manualPeerConnection.connectionState);
+                    if (manualPeerConnection.connectionState === 'connected') {
+                        showStatus('broadcastStatus', 'Connected to viewer!', 'success');
+                        connections.add({ peerConnection: manualPeerConnection });
+                        updateViewerCount();
+                        startStatsMonitoring(true);
+                    } else if (manualPeerConnection.connectionState === 'failed' ||
+                               manualPeerConnection.connectionState === 'disconnected') {
+                        showStatus('broadcastStatus', 'Connection failed or disconnected', 'error');
+                        connections.clear();
+                        updateViewerCount();
+                        stopStatsMonitoring();
+                    }
+                };
+
+                // Create offer
+                const offer = await manualPeerConnection.createOffer();
+                await manualPeerConnection.setLocalDescription(offer);
+
+                showStatus('broadcastStatus', 'Generating offer... (collecting ICE candidates)', 'info');
+
+            } catch (err) {
+                console.error('Error creating offer:', err);
+                showStatus('broadcastStatus', 'Failed to create offer: ' + err.message, 'error');
+            }
+        }
+
+        // Manual WebRTC: Broadcaster sets answer
+        async function setRemoteAnswer() {
+            try {
+                const answerText = document.getElementById('manualAnswer').value.trim();
+                if (!answerText) {
+                    showStatus('broadcastStatus', 'Please paste viewer\'s answer', 'error');
+                    return;
+                }
+
+                const answerData = JSON.parse(answerText);
+
+                // Set remote description
+                await manualPeerConnection.setRemoteDescription(new RTCSessionDescription({
+                    type: answerData.type,
+                    sdp: answerData.sdp
+                }));
+
+                // Add ICE candidates
+                for (const candidate of answerData.candidates) {
+                    await manualPeerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                }
+
+                showStatus('broadcastStatus', 'Answer set! Connecting...', 'info');
+
+            } catch (err) {
+                console.error('Error setting answer:', err);
+                showStatus('broadcastStatus', 'Failed to set answer: ' + err.message, 'error');
+            }
+        }
+
+        // Manual WebRTC: Viewer generates answer
+        async function generateAnswer() {
+            try {
+                const offerText = document.getElementById('viewerOffer').value.trim();
+                if (!offerText) {
+                    showStatus('viewerStatus', 'Please paste broadcaster\'s offer', 'error');
+                    return;
+                }
+
+                showStatus('viewerStatus', 'Processing offer...', 'info');
+
+                const offerData = JSON.parse(offerText);
+
+                // Create peer connection
+                manualPeerConnection = new RTCPeerConnection({
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                });
+
+                // Handle incoming stream
+                manualPeerConnection.ontrack = (event) => {
+                    console.log('Remote track received:', event.streams[0]);
+                    document.getElementById('remoteVideo').srcObject = event.streams[0];
+                    document.getElementById('remoteVideoContainer').style.display = 'block';
+                    showStatus('viewerStatus', 'Streaming!', 'success');
+                    startStatsMonitoring(false);
+                };
+
+                // Monitor connection state
+                manualPeerConnection.onconnectionstatechange = () => {
+                    console.log('Connection state:', manualPeerConnection.connectionState);
+                    if (manualPeerConnection.connectionState === 'connected') {
+                        showStatus('viewerStatus', 'Connected!', 'success');
+                    } else if (manualPeerConnection.connectionState === 'failed' ||
+                               manualPeerConnection.connectionState === 'disconnected') {
+                        showStatus('viewerStatus', 'Connection failed or disconnected', 'error');
+                        document.getElementById('remoteVideoContainer').style.display = 'none';
+                        stopStatsMonitoring();
+                    }
+                };
+
+                // Store as currentCall for stats monitoring compatibility
+                currentCall = { peerConnection: manualPeerConnection };
+
+                // Set remote description
+                await manualPeerConnection.setRemoteDescription(new RTCSessionDescription({
+                    type: offerData.type,
+                    sdp: offerData.sdp
+                }));
+
+                // Add ICE candidates from offer
+                for (const candidate of offerData.candidates) {
+                    await manualPeerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                }
+
+                // Create answer
+                const answer = await manualPeerConnection.createAnswer();
+                await manualPeerConnection.setLocalDescription(answer);
+
+                // Collect ICE candidates for answer
+                pendingIceCandidates = [];
+                manualPeerConnection.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        pendingIceCandidates.push(event.candidate);
+                    } else {
+                        // All ICE candidates collected, generate final answer
+                        const answerData = {
+                            type: manualPeerConnection.localDescription.type,
+                            sdp: manualPeerConnection.localDescription.sdp,
+                            candidates: pendingIceCandidates
+                        };
+                        document.getElementById('viewerAnswer').value = JSON.stringify(answerData);
+                        showStatus('viewerStatus', 'Answer generated! Copy and send to broadcaster.', 'success');
+                    }
+                };
+
+                showStatus('viewerStatus', 'Generating answer... (collecting ICE candidates)', 'info');
+
+            } catch (err) {
+                console.error('Error generating answer:', err);
+                showStatus('viewerStatus', 'Failed to generate answer: ' + err.message, 'error');
+            }
+        }
+
         // 페이지 로드 시 URL 파라미터 체크
         window.addEventListener('DOMContentLoaded', () => {
+            // Initialize UI based on default signaling mode
+            updateSignalingUI();
+            updateViewerSignalingUI();
             const urlParams = new URLSearchParams(window.location.search);
             const peerId = urlParams.get('id');
 
@@ -1118,6 +1446,16 @@
                 document.getElementById('localVideo').srcObject = localStream;
                 document.getElementById('broadcastInfo').style.display = 'block';
                 document.getElementById('startBroadcast').style.display = 'none';
+
+                // Check if manual mode
+                if (isManualMode) {
+                    // Show video container but hide PeerJS-specific elements
+                    document.getElementById('peerjsInfo').style.display = 'none';
+                    document.getElementById('peerjsQR').style.display = 'none';
+                    // Create manual offer
+                    createManualOffer();
+                    return;
+                }
 
                 // Connection mode 확인
                 const connectionMode = document.getElementById('connectionMode').value;
@@ -1355,7 +1693,12 @@
                 currentCall.close();
                 currentCall = null;
             }
+            if (manualPeerConnection) {
+                manualPeerConnection.close();
+                manualPeerConnection = null;
+            }
             connections.clear();
+            pendingIceCandidates = [];
 
             // QR 코드 초기화
             const qrContainer = document.getElementById('qrcode');
