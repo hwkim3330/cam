@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>웹캠 실시간 스트리밍 - WebRTC</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 900px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.9em;
+        }
+
+        .mode-selector {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .mode-btn:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .mode-btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .panel {
+            display: none;
+        }
+
+        .panel.active {
+            display: block;
+        }
+
+        .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+
+        .info-box strong {
+            color: #667eea;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 20px;
+        }
+
+        video {
+            width: 100%;
+            display: block;
+            max-height: 500px;
+        }
+
+        .status {
+            text-align: center;
+            padding: 10px;
+            margin-top: 15px;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .stat-item {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.8em;
+            color: #666;
+        }
+
+        .stat-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .copy-btn {
+            display: inline-block;
+            padding: 5px 10px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            margin-left: 10px;
+        }
+
+        .copy-btn:hover {
+            background: #218838;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 1.5em;
+            }
+
+            .mode-selector {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📹 웹캠 실시간 스트리밍</h1>
+        <p class="subtitle">WebRTC P2P 저지연 스트리밍</p>
+
+        <div class="mode-selector">
+            <button class="mode-btn active" onclick="setMode('broadcast')">📡 송출하기</button>
+            <button class="mode-btn" onclick="setMode('viewer')">👀 시청하기</button>
+        </div>
+
+        <!-- 송출 패널 -->
+        <div id="broadcast-panel" class="panel active">
+            <div class="info-box">
+                <strong>송출 모드:</strong> 내 웹캠을 다른 사람에게 공유합니다.
+            </div>
+
+            <button id="startBroadcast" onclick="startBroadcast()">웹캠 시작</button>
+
+            <div id="broadcastInfo" style="display: none;">
+                <div class="input-group">
+                    <label>공유 ID (다른 사람에게 전달하세요)</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="myPeerId" readonly>
+                        <button class="copy-btn" onclick="copyPeerId()">복사</button>
+                    </div>
+                </div>
+
+                <div class="video-container">
+                    <video id="localVideo" autoplay muted playsinline></video>
+                </div>
+
+                <div class="stats">
+                    <div class="stat-item">
+                        <div class="stat-label">연결된 시청자</div>
+                        <div class="stat-value" id="viewerCount">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">전송 품질</div>
+                        <div class="stat-value" id="quality">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="broadcastStatus"></div>
+        </div>
+
+        <!-- 시청 패널 -->
+        <div id="viewer-panel" class="panel">
+            <div class="info-box">
+                <strong>시청 모드:</strong> 송출자의 ID를 입력하여 스트림을 시청합니다.
+            </div>
+
+            <div class="input-group">
+                <label>송출자 ID 입력</label>
+                <input type="text" id="remotePeerId" placeholder="송출자가 공유한 ID를 입력하세요">
+            </div>
+
+            <button id="connectBtn" onclick="connectToStream()">연결하기</button>
+
+            <div id="remoteVideoContainer" style="display: none;">
+                <div class="video-container">
+                    <video id="remoteVideo" autoplay playsinline></video>
+                </div>
+
+                <div class="stats">
+                    <div class="stat-item">
+                        <div class="stat-label">연결 상태</div>
+                        <div class="stat-value" id="connectionState">연결됨</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">수신 품질</div>
+                        <div class="stat-value" id="rxQuality">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="viewerStatus"></div>
+        </div>
+    </div>
+
+    <!-- PeerJS CDN -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
+    <script>
+        let peer = null;
+        let localStream = null;
+        let currentCall = null;
+        const connections = new Set();
+
+        // 모드 전환
+        function setMode(mode) {
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
+
+            if (mode === 'broadcast') {
+                document.querySelector('.mode-btn:nth-child(1)').classList.add('active');
+                document.getElementById('broadcast-panel').classList.add('active');
+            } else {
+                document.querySelector('.mode-btn:nth-child(2)').classList.add('active');
+                document.getElementById('viewer-panel').classList.add('active');
+            }
+
+            // 이전 연결 정리
+            cleanup();
+        }
+
+        // 송출 시작
+        async function startBroadcast() {
+            try {
+                showStatus('broadcastStatus', '웹캠 접근 중...', 'info');
+
+                // 웹캠 스트림 획득
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        frameRate: { ideal: 30 }
+                    },
+                    audio: true
+                });
+
+                // 로컬 비디오 표시
+                document.getElementById('localVideo').srcObject = localStream;
+                document.getElementById('broadcastInfo').style.display = 'block';
+                document.getElementById('startBroadcast').style.display = 'none';
+
+                // Peer 초기화
+                peer = new Peer({
+                    config: {
+                        iceServers: [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            { urls: 'stun:stun1.l.google.com:19302' }
+                        ]
+                    }
+                });
+
+                peer.on('open', (id) => {
+                    document.getElementById('myPeerId').value = id;
+                    showStatus('broadcastStatus', '송출 준비 완료! ID를 공유하세요.', 'success');
+                });
+
+                peer.on('call', (call) => {
+                    // 시청자의 연결 수락
+                    call.answer(localStream);
+                    connections.add(call);
+                    updateViewerCount();
+
+                    call.on('close', () => {
+                        connections.delete(call);
+                        updateViewerCount();
+                    });
+
+                    showStatus('broadcastStatus', '시청자가 연결되었습니다!', 'success');
+                });
+
+                peer.on('error', (err) => {
+                    showStatus('broadcastStatus', '오류: ' + err.message, 'error');
+                });
+
+            } catch (err) {
+                showStatus('broadcastStatus', '웹캠 접근 실패: ' + err.message, 'error');
+            }
+        }
+
+        // 스트림 연결 (시청자)
+        async function connectToStream() {
+            const remotePeerId = document.getElementById('remotePeerId').value.trim();
+
+            if (!remotePeerId) {
+                showStatus('viewerStatus', 'ID를 입력하세요', 'error');
+                return;
+            }
+
+            try {
+                showStatus('viewerStatus', '연결 중...', 'info');
+                document.getElementById('connectBtn').disabled = true;
+
+                // Peer 초기화
+                peer = new Peer({
+                    config: {
+                        iceServers: [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            { urls: 'stun:stun1.l.google.com:19302' }
+                        ]
+                    }
+                });
+
+                peer.on('open', () => {
+                    // 송출자에게 연결
+                    currentCall = peer.call(remotePeerId, new MediaStream());
+
+                    currentCall.on('stream', (remoteStream) => {
+                        document.getElementById('remoteVideo').srcObject = remoteStream;
+                        document.getElementById('remoteVideoContainer').style.display = 'block';
+                        showStatus('viewerStatus', '스트림 수신 중!', 'success');
+                        document.getElementById('connectBtn').disabled = false;
+                    });
+
+                    currentCall.on('close', () => {
+                        showStatus('viewerStatus', '연결이 종료되었습니다', 'error');
+                        document.getElementById('remoteVideoContainer').style.display = 'none';
+                        document.getElementById('connectBtn').disabled = false;
+                    });
+
+                    currentCall.on('error', (err) => {
+                        showStatus('viewerStatus', '연결 오류: ' + err.message, 'error');
+                        document.getElementById('connectBtn').disabled = false;
+                    });
+                });
+
+                peer.on('error', (err) => {
+                    showStatus('viewerStatus', '오류: ' + err.message, 'error');
+                    document.getElementById('connectBtn').disabled = false;
+                });
+
+            } catch (err) {
+                showStatus('viewerStatus', '연결 실패: ' + err.message, 'error');
+                document.getElementById('connectBtn').disabled = false;
+            }
+        }
+
+        // ID 복사
+        function copyPeerId() {
+            const peerIdInput = document.getElementById('myPeerId');
+            peerIdInput.select();
+            document.execCommand('copy');
+
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = '✓ 복사됨';
+            setTimeout(() => {
+                btn.textContent = originalText;
+            }, 2000);
+        }
+
+        // 시청자 수 업데이트
+        function updateViewerCount() {
+            document.getElementById('viewerCount').textContent = connections.size;
+        }
+
+        // 상태 메시지 표시
+        function showStatus(elementId, message, type) {
+            const statusEl = document.getElementById(elementId);
+            statusEl.textContent = message;
+            statusEl.className = 'status ' + type;
+        }
+
+        // 정리
+        function cleanup() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            if (peer) {
+                peer.destroy();
+                peer = null;
+            }
+            if (currentCall) {
+                currentCall.close();
+                currentCall = null;
+            }
+            connections.clear();
+        }
+
+        // 페이지 종료 시 정리
+        window.addEventListener('beforeunload', cleanup);
+    </script>
+</body>
+</html>
