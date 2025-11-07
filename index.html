@@ -342,8 +342,24 @@
                         <div class="stat-value" id="viewerCount">0</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-label">전송 품질</div>
-                        <div class="stat-value" id="quality">-</div>
+                        <div class="stat-label">해상도</div>
+                        <div class="stat-value" id="txResolution">-</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">프레임레이트</div>
+                        <div class="stat-value" id="txFps">-</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">비트레이트</div>
+                        <div class="stat-value" id="txBitrate">-</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">코덱</div>
+                        <div class="stat-value" id="txCodec">-</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">패킷 손실</div>
+                        <div class="stat-value" id="txPacketLoss">-</div>
                     </div>
                 </div>
             </div>
@@ -371,12 +387,28 @@
 
                 <div class="stats">
                     <div class="stat-item">
-                        <div class="stat-label">연결 상태</div>
-                        <div class="stat-value" id="connectionState">연결됨</div>
+                        <div class="stat-label">해상도</div>
+                        <div class="stat-value" id="rxResolution">-</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-label">수신 품질</div>
-                        <div class="stat-value" id="rxQuality">-</div>
+                        <div class="stat-label">프레임레이트</div>
+                        <div class="stat-value" id="rxFps">-</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">비트레이트</div>
+                        <div class="stat-value" id="rxBitrate">-</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">레이턴시</div>
+                        <div class="stat-value" id="rxLatency">-</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">지터</div>
+                        <div class="stat-value" id="rxJitter">-</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">패킷 손실</div>
+                        <div class="stat-value" id="rxPacketLoss">-</div>
                     </div>
                 </div>
             </div>
@@ -396,6 +428,169 @@
         let currentCall = null;
         let qrCodeInstance = null;
         const connections = new Set();
+        let statsInterval = null;
+        let lastBytesSent = 0;
+        let lastBytesReceived = 0;
+        let lastStatsTime = 0;
+
+        // 송출자 통계 업데이트
+        async function updateBroadcasterStats() {
+            if (!currentCall && connections.size === 0) return;
+
+            try {
+                // 첫 번째 연결의 peerConnection 가져오기
+                const conn = Array.from(connections)[0];
+                if (!conn || !conn.peerConnection) return;
+
+                const stats = await conn.peerConnection.getStats();
+                const now = Date.now();
+
+                stats.forEach(report => {
+                    // 송신 비디오 트랙 정보
+                    if (report.type === 'outbound-rtp' && report.kind === 'video') {
+                        // 해상도
+                        if (report.frameWidth && report.frameHeight) {
+                            document.getElementById('txResolution').textContent =
+                                `${report.frameWidth}x${report.frameHeight}`;
+                        }
+
+                        // 프레임레이트
+                        if (report.framesPerSecond) {
+                            document.getElementById('txFps').textContent =
+                                `${Math.round(report.framesPerSecond)} fps`;
+                        }
+
+                        // 비트레이트 계산
+                        if (report.bytesSent && lastBytesSent > 0 && lastStatsTime > 0) {
+                            const bytesDiff = report.bytesSent - lastBytesSent;
+                            const timeDiff = (now - lastStatsTime) / 1000;
+                            const bitrate = (bytesDiff * 8) / timeDiff / 1000; // kbps
+                            document.getElementById('txBitrate').textContent =
+                                `${Math.round(bitrate)} kbps`;
+                        }
+                        lastBytesSent = report.bytesSent;
+                    }
+
+                    // 코덱 정보
+                    if (report.type === 'codec' && report.mimeType && report.mimeType.includes('video')) {
+                        const codecName = report.mimeType.split('/')[1].toUpperCase();
+                        document.getElementById('txCodec').textContent = codecName;
+                    }
+
+                    // 원격 수신 통계 (패킷 손실)
+                    if (report.type === 'remote-inbound-rtp' && report.kind === 'video') {
+                        if (report.packetsLost !== undefined && report.packetsReceived !== undefined) {
+                            const total = report.packetsLost + report.packetsReceived;
+                            const lossRate = total > 0 ? (report.packetsLost / total * 100) : 0;
+                            document.getElementById('txPacketLoss').textContent =
+                                `${lossRate.toFixed(2)}%`;
+                        }
+                    }
+                });
+
+                lastStatsTime = now;
+            } catch (err) {
+                console.error('통계 업데이트 실패:', err);
+            }
+        }
+
+        // 시청자 통계 업데이트
+        async function updateViewerStats() {
+            if (!currentCall || !currentCall.peerConnection) return;
+
+            try {
+                const stats = await currentCall.peerConnection.getStats();
+                const now = Date.now();
+
+                stats.forEach(report => {
+                    // 수신 비디오 트랙 정보
+                    if (report.type === 'inbound-rtp' && report.kind === 'video') {
+                        // 해상도
+                        if (report.frameWidth && report.frameHeight) {
+                            document.getElementById('rxResolution').textContent =
+                                `${report.frameWidth}x${report.frameHeight}`;
+                        }
+
+                        // 프레임레이트
+                        if (report.framesPerSecond) {
+                            document.getElementById('rxFps').textContent =
+                                `${Math.round(report.framesPerSecond)} fps`;
+                        }
+
+                        // 비트레이트 계산
+                        if (report.bytesReceived && lastBytesReceived > 0 && lastStatsTime > 0) {
+                            const bytesDiff = report.bytesReceived - lastBytesReceived;
+                            const timeDiff = (now - lastStatsTime) / 1000;
+                            const bitrate = (bytesDiff * 8) / timeDiff / 1000; // kbps
+                            document.getElementById('rxBitrate').textContent =
+                                `${Math.round(bitrate)} kbps`;
+                        }
+                        lastBytesReceived = report.bytesReceived;
+
+                        // 지터
+                        if (report.jitter !== undefined) {
+                            document.getElementById('rxJitter').textContent =
+                                `${(report.jitter * 1000).toFixed(1)} ms`;
+                        }
+
+                        // 패킷 손실
+                        if (report.packetsLost !== undefined && report.packetsReceived !== undefined) {
+                            const total = report.packetsLost + report.packetsReceived;
+                            const lossRate = total > 0 ? (report.packetsLost / total * 100) : 0;
+                            document.getElementById('rxPacketLoss').textContent =
+                                `${lossRate.toFixed(2)}%`;
+                        }
+
+                        // 레이턴시 (jitterBufferDelay)
+                        if (report.jitterBufferDelay !== undefined && report.jitterBufferEmittedCount > 0) {
+                            const latency = (report.jitterBufferDelay / report.jitterBufferEmittedCount) * 1000;
+                            document.getElementById('rxLatency').textContent =
+                                `${Math.round(latency)} ms`;
+                        }
+                    }
+
+                    // ICE 후보 쌍에서 RTT (Round Trip Time) 가져오기
+                    if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+                        if (report.currentRoundTripTime !== undefined) {
+                            document.getElementById('rxLatency').textContent =
+                                `${Math.round(report.currentRoundTripTime * 1000)} ms`;
+                        }
+                    }
+                });
+
+                lastStatsTime = now;
+            } catch (err) {
+                console.error('통계 업데이트 실패:', err);
+            }
+        }
+
+        // 통계 업데이트 시작
+        function startStatsMonitoring(isBroadcaster) {
+            // 기존 인터벌 정리
+            if (statsInterval) {
+                clearInterval(statsInterval);
+            }
+
+            // 1초마다 통계 업데이트
+            statsInterval = setInterval(() => {
+                if (isBroadcaster) {
+                    updateBroadcasterStats();
+                } else {
+                    updateViewerStats();
+                }
+            }, 1000);
+        }
+
+        // 통계 업데이트 중지
+        function stopStatsMonitoring() {
+            if (statsInterval) {
+                clearInterval(statsInterval);
+                statsInterval = null;
+            }
+            lastBytesSent = 0;
+            lastBytesReceived = 0;
+            lastStatsTime = 0;
+        }
 
         // 페이지 로드 시 URL 파라미터 체크
         window.addEventListener('DOMContentLoaded', () => {
@@ -489,9 +684,19 @@
                     connections.add(call);
                     updateViewerCount();
 
+                    // 통계 모니터링 시작
+                    if (connections.size === 1) {
+                        startStatsMonitoring(true);
+                    }
+
                     call.on('close', () => {
                         connections.delete(call);
                         updateViewerCount();
+
+                        // 모든 연결이 끊어지면 통계 모니터링 중지
+                        if (connections.size === 0) {
+                            stopStatsMonitoring();
+                        }
                     });
 
                     showStatus('broadcastStatus', '시청자가 연결되었습니다!', 'success');
@@ -556,18 +761,27 @@
                         document.getElementById('remoteVideoContainer').style.display = 'block';
                         showStatus('viewerStatus', '스트림 수신 중!', 'success');
                         document.getElementById('connectBtn').disabled = false;
+
+                        // 통계 모니터링 시작
+                        startStatsMonitoring(false);
                     });
 
                     currentCall.on('close', () => {
                         showStatus('viewerStatus', '연결이 종료되었습니다', 'error');
                         document.getElementById('remoteVideoContainer').style.display = 'none';
                         document.getElementById('connectBtn').disabled = false;
+
+                        // 통계 모니터링 중지
+                        stopStatsMonitoring();
                     });
 
                     currentCall.on('error', (err) => {
                         console.error('Call 오류:', err);
                         showStatus('viewerStatus', '연결 오류: ' + err.message, 'error');
                         document.getElementById('connectBtn').disabled = false;
+
+                        // 통계 모니터링 중지
+                        stopStatsMonitoring();
                     });
                 });
 
@@ -632,6 +846,9 @@
                 qrContainer.innerHTML = '';
             }
             qrCodeInstance = null;
+
+            // 통계 모니터링 중지
+            stopStatsMonitoring();
         }
 
         // 페이지 종료 시 정리
