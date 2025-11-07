@@ -446,6 +446,23 @@
                 showStatus('viewerStatus', '연결 중...', 'info');
                 document.getElementById('connectBtn').disabled = true;
 
+                // 더미 스트림 생성 (WebRTC 연결을 위해 필요)
+                const canvas = document.createElement('canvas');
+                canvas.width = 640;
+                canvas.height = 480;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = 'black';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                const dummyStream = canvas.captureStream(1); // 1fps 더미 스트림
+
+                // 더미 오디오 트랙 추가
+                const audioContext = new AudioContext();
+                const oscillator = audioContext.createOscillator();
+                const dst = oscillator.connect(audioContext.createMediaStreamDestination());
+                oscillator.start();
+                dummyStream.addTrack(dst.stream.getAudioTracks()[0]);
+
                 // Peer 초기화
                 peer = new Peer({
                     config: {
@@ -457,10 +474,11 @@
                 });
 
                 peer.on('open', () => {
-                    // 송출자에게 연결
-                    currentCall = peer.call(remotePeerId, new MediaStream());
+                    // 송출자에게 연결 (더미 스트림 전송)
+                    currentCall = peer.call(remotePeerId, dummyStream);
 
                     currentCall.on('stream', (remoteStream) => {
+                        console.log('스트림 수신됨:', remoteStream);
                         document.getElementById('remoteVideo').srcObject = remoteStream;
                         document.getElementById('remoteVideoContainer').style.display = 'block';
                         showStatus('viewerStatus', '스트림 수신 중!', 'success');
@@ -474,17 +492,20 @@
                     });
 
                     currentCall.on('error', (err) => {
+                        console.error('Call 오류:', err);
                         showStatus('viewerStatus', '연결 오류: ' + err.message, 'error');
                         document.getElementById('connectBtn').disabled = false;
                     });
                 });
 
                 peer.on('error', (err) => {
+                    console.error('Peer 오류:', err);
                     showStatus('viewerStatus', '오류: ' + err.message, 'error');
                     document.getElementById('connectBtn').disabled = false;
                 });
 
             } catch (err) {
+                console.error('연결 실패:', err);
                 showStatus('viewerStatus', '연결 실패: ' + err.message, 'error');
                 document.getElementById('connectBtn').disabled = false;
             }
