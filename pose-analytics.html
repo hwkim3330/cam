@@ -440,8 +440,8 @@
             showSkeleton: true,
             showFace: true,
             showLabels: true,
-            minPoseConfidence: 0.3,
-            minFaceConfidence: 0.5
+            minPoseConfidence: 0.15,
+            minFaceConfidence: 0.3
         };
 
         // Global variables
@@ -609,6 +609,11 @@
             const keypoints = pose.keypoints;
             const color = getPersonColor(index);
 
+            // Debug: log keypoints length
+            if (frameCount % 60 === 0 && index === 0) {
+                console.log('Keypoints:', keypoints.length, 'First KP:', keypoints[0]);
+            }
+
             // Draw skeleton connections
             const connections = [
                 [5, 6], [5, 7], [7, 9], [6, 8], [8, 10], // Arms
@@ -620,7 +625,7 @@
             connections.forEach(([i, j]) => {
                 const kp1 = keypoints[i];
                 const kp2 = keypoints[j];
-                if (kp1.score > 0.3 && kp2.score > 0.3) {
+                if (kp1 && kp2 && kp1.score > 0.2 && kp2.score > 0.2) {
                     // Outer glow
                     ctx.shadowColor = color;
                     ctx.shadowBlur = 15;
@@ -645,7 +650,7 @@
 
             // Draw keypoints with glow
             keypoints.forEach(kp => {
-                if (kp.score > 0.3) {
+                if (kp && kp.score > 0.2) {
                     // Outer glow
                     ctx.shadowColor = color;
                     ctx.shadowBlur = 20;
@@ -809,18 +814,42 @@
         // Estimate height from pose
         function estimateHeight(pose) {
             const nose = pose.keypoints.find(kp => kp.name === 'nose');
+            const leftShoulder = pose.keypoints.find(kp => kp.name === 'left_shoulder');
+            const rightShoulder = pose.keypoints.find(kp => kp.name === 'right_shoulder');
+            const leftHip = pose.keypoints.find(kp => kp.name === 'left_hip');
+            const rightHip = pose.keypoints.find(kp => kp.name === 'right_hip');
             const leftAnkle = pose.keypoints.find(kp => kp.name === 'left_ankle');
             const rightAnkle = pose.keypoints.find(kp => kp.name === 'right_ankle');
 
-            if (!nose || !leftAnkle || !rightAnkle) return 0;
-            if (nose.score < 0.3 || (leftAnkle.score < 0.3 && rightAnkle.score < 0.3)) return 0;
+            // Method 1: Full body visible (nose to ankle)
+            if (nose && nose.score > 0.2) {
+                if ((leftAnkle && leftAnkle.score > 0.2) || (rightAnkle && rightAnkle.score > 0.2)) {
+                    const ankle = (leftAnkle && leftAnkle.score > 0.2) ? leftAnkle : rightAnkle;
+                    const pixelHeight = Math.abs(ankle.y - nose.y);
+                    const estimatedHeight = Math.round((pixelHeight / 400) * 170);
+                    return Math.min(220, Math.max(140, estimatedHeight));
+                }
+            }
 
-            const ankle = leftAnkle.score > rightAnkle.score ? leftAnkle : rightAnkle;
-            const pixelHeight = Math.abs(ankle.y - nose.y);
+            // Method 2: Upper body only (nose to hip) - estimate full height
+            if (nose && nose.score > 0.2 && ((leftHip && leftHip.score > 0.2) || (rightHip && rightHip.score > 0.2))) {
+                const hip = (leftHip && leftHip.score > 0.2) ? leftHip : rightHip;
+                const upperBodyHeight = Math.abs(hip.y - nose.y);
+                // Upper body (head to hip) is roughly 50% of total height
+                const estimatedHeight = Math.round((upperBodyHeight / 0.5) * (170 / 400));
+                return Math.min(220, Math.max(140, estimatedHeight));
+            }
 
-            // Rough estimation: assume average person is 170cm and takes ~400 pixels
-            const estimatedHeight = Math.round((pixelHeight / 400) * 170);
-            return Math.min(220, Math.max(140, estimatedHeight));
+            // Method 3: Shoulder width based estimation
+            if (leftShoulder && rightShoulder && leftShoulder.score > 0.2 && rightShoulder.score > 0.2) {
+                const shoulderWidth = Math.abs(rightShoulder.x - leftShoulder.x);
+                // Average shoulder width is about 45cm, average height 170cm
+                // Ratio: height/shoulder_width ≈ 3.8
+                const estimatedHeight = Math.round((shoulderWidth * 3.8) * (170 / 400));
+                return Math.min(220, Math.max(140, estimatedHeight));
+            }
+
+            return 0;
         }
 
         // Detect activity from pose
@@ -836,10 +865,10 @@
             const rightKnee = keypoints.find(kp => kp.name === 'right_knee');
 
             // Check if raising hand
-            if (leftWrist && leftShoulder && leftWrist.y < leftShoulder.y && leftWrist.score > 0.3) {
+            if (leftWrist && leftShoulder && leftWrist.y < leftShoulder.y && leftWrist.score > 0.2 && leftShoulder.score > 0.2) {
                 return 'Raising Hand';
             }
-            if (rightWrist && rightShoulder && rightWrist.y < rightShoulder.y && rightWrist.score > 0.3) {
+            if (rightWrist && rightShoulder && rightWrist.y < rightShoulder.y && rightWrist.score > 0.2 && rightShoulder.score > 0.2) {
                 return 'Raising Hand';
             }
 
