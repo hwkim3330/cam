@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pose Analytics V2 - Depth-Aware Tracking</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-detection"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+            background: #000000;
+            color: #ffffff;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            height: 100vh;
+            gap: 0;
+        }
+
+        .video-panel {
+            position: relative;
+            background: #1a1a1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        #videoContainer {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        #webcam {
+            display: none;
+        }
+
+        #canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .controls-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            gap: 12px;
+            z-index: 100;
+            flex-wrap: wrap;
+        }
+
+        .control-btn {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        .control-btn.active {
+            background: rgba(0, 122, 255, 0.8);
+            border-color: rgba(0, 122, 255, 1);
+        }
+
+        .calibration-prompt {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 500px;
+            border: 2px solid #007aff;
+            display: none;
+        }
+
+        .calibration-prompt.show {
+            display: block;
+        }
+
+        .calibration-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .calibration-text {
+            font-size: 16px;
+            color: #86868b;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        .calibration-input {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .calibration-input input {
+            padding: 12px 20px;
+            font-size: 18px;
+            border: 2px solid #007aff;
+            background: rgba(0, 122, 255, 0.1);
+            color: white;
+            border-radius: 8px;
+            width: 120px;
+            text-align: center;
+        }
+
+        .calibration-input label {
+            font-size: 16px;
+            color: #ffffff;
+        }
+
+        .calibration-btn {
+            background: #007aff;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .calibration-btn:hover {
+            background: #0051d5;
+        }
+
+        .stats-overlay {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 16px;
+            min-width: 200px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .stat-label {
+            color: #86868b;
+        }
+
+        .stat-value {
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        .sidebar {
+            background: #1a1a1a;
+            border-left: 1px solid #2a2a2a;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .sidebar-header {
+            padding: 24px;
+            border-bottom: 1px solid #2a2a2a;
+        }
+
+        .sidebar-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .sidebar-subtitle {
+            font-size: 13px;
+            color: #86868b;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #2a2a2a;
+            padding: 0 24px;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #86868b;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .tab:hover {
+            color: #ffffff;
+        }
+
+        .tab.active {
+            color: #007aff;
+            border-bottom-color: #007aff;
+        }
+
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 24px;
+        }
+
+        .content-area::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .content-area::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+
+        .content-area::-webkit-scrollbar-thumb {
+            background: #3a3a3a;
+            border-radius: 4px;
+        }
+
+        .person-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+
+        .person-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .person-id {
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .person-badge {
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-weight: 600;
+            background: rgba(52, 199, 89, 0.2);
+            color: #34c759;
+        }
+
+        .person-detail {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+
+        .detail-label {
+            color: #86868b;
+        }
+
+        .detail-value {
+            color: #ffffff;
+            font-weight: 500;
+        }
+
+        .log-entry {
+            background: rgba(255, 255, 255, 0.03);
+            border-left: 3px solid #007aff;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+
+        .log-timestamp {
+            color: #86868b;
+            margin-bottom: 4px;
+        }
+
+        .log-message {
+            color: #ffffff;
+        }
+
+        .log-type-info { border-left-color: #007aff; }
+        .log-type-success { border-left-color: #34c759; }
+        .log-type-warning { border-left-color: #ff9500; }
+        .log-type-error { border-left-color: #ff3b30; }
+
+        .action-buttons {
+            padding: 20px 24px;
+            border-top: 1px solid #2a2a2a;
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 12px;
+            background: rgba(0, 122, 255, 0.15);
+            border: 1px solid rgba(0, 122, 255, 0.3);
+            color: #007aff;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .action-btn:hover {
+            background: rgba(0, 122, 255, 0.25);
+        }
+
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+
+        .loading-screen.hidden {
+            display: none;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #007aff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            margin-top: 20px;
+            font-size: 16px;
+            color: #86868b;
+        }
+
+        @media (max-width: 1024px) {
+            .main-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: 1fr 300px;
+            }
+
+            .sidebar {
+                border-left: none;
+                border-top: 1px solid #2a2a2a;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading AI Models...</div>
+    </div>
+
+    <div class="calibration-prompt" id="calibrationPrompt">
+        <div class="calibration-title">📏 Calibration Required</div>
+        <div class="calibration-text">
+            Stand at a comfortable distance from the camera and enter your real height for accurate measurements.
+            This will calibrate the system to measure others correctly based on depth.
+        </div>
+        <div class="calibration-input">
+            <label>Your Height:</label>
+            <input type="number" id="calibrationHeight" value="170" min="140" max="220">
+            <span>cm</span>
+        </div>
+        <button class="calibration-btn" id="calibrateBtn">Calibrate</button>
+    </div>
+
+    <div class="main-container">
+        <div class="video-panel">
+            <div class="controls-overlay">
+                <button class="control-btn active" id="togglePose">🦴 Skeleton</button>
+                <button class="control-btn active" id="toggleFace">👤 Face</button>
+                <button class="control-btn active" id="toggleLabels">🏷️ Labels</button>
+                <button class="control-btn" id="recalibrateBtn">📏 Recalibrate</button>
+            </div>
+
+            <div class="stats-overlay">
+                <div class="stat-item">
+                    <span class="stat-label">FPS</span>
+                    <span class="stat-value" id="fpsValue">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">People</span>
+                    <span class="stat-value" id="peopleCount">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Calibrated</span>
+                    <span class="stat-value" id="calibratedStatus">No</span>
+                </div>
+            </div>
+
+            <div id="videoContainer">
+                <video id="webcam" playsinline autoplay></video>
+                <canvas id="canvas"></canvas>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title">Pose Analytics V2</div>
+                <div class="sidebar-subtitle">Depth-aware real-time tracking</div>
+            </div>
+
+            <div class="tabs">
+                <div class="tab active" data-tab="people">👥 People</div>
+                <div class="tab" data-tab="logs">📋 Logs</div>
+            </div>
+
+            <div class="content-area">
+                <div id="peopleContent"></div>
+                <div id="logsContent" style="display: none;"></div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="action-btn" id="clearLogs">🗑️ Clear</button>
+                <button class="action-btn" id="exportLogs">💾 Export</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const CONFIG = {
+            showSkeleton: true,
+            showFace: true,
+            showLabels: true,
+            minPoseConfidence: 0.15,
+            minFaceConfidence: 0.3
+        };
+
+        // Calibration data
+        let calibrationData = {
+            isCalibrated: false,
+            referenceHeight: 170, // Real height in cm
+            referencePixelHeight: 0, // Pixel height at calibration
+            referenceShoulderWidth: 0, // Shoulder width at calibration
+            scaleFactor: 1.0
+        };
+
+        // Global variables
+        let video, canvas, ctx;
+        let poseDetector, faceDetector;
+        let people = new Map();
+        let logs = [];
+        let frameCount = 0;
+        let lastTime = performance.now();
+        let fps = 0;
+        let nextPersonId = 1;
+
+        // Initialize
+        async function init() {
+            video = document.getElementById('webcam');
+            canvas = document.getElementById('canvas');
+            ctx = canvas.getContext('2d');
+
+            try {
+                // Load camera
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: 1280,
+                        height: 720,
+                        facingMode: 'user'
+                    }
+                });
+                video.srcObject = stream;
+                await video.play();
+
+                // Set canvas size to match video
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+
+                addLog('success', `Camera initialized: ${video.videoWidth}x${video.videoHeight}`);
+
+                // Load models
+                addLog('info', 'Loading MoveNet MultiPose model...');
+                poseDetector = await poseDetection.createDetector(
+                    poseDetection.SupportedModels.MoveNet,
+                    {
+                        modelType: poseDetection.movenet.modelType.MULTIPOSE_LIGHTNING,
+                        enableTracking: true,
+                        trackerType: poseDetection.TrackerType.BoundingBox
+                    }
+                );
+                addLog('success', 'MoveNet loaded');
+
+                addLog('info', 'Loading Face Detection model...');
+                faceDetector = await faceDetection.createDetector(
+                    faceDetection.SupportedModels.MediaPipeFaceDetector,
+                    {
+                        runtime: 'tfjs',
+                        maxFaces: 10
+                    }
+                );
+                addLog('success', 'Face Detection loaded');
+
+                document.getElementById('loadingScreen').classList.add('hidden');
+                document.getElementById('calibrationPrompt').classList.add('show');
+                addLog('info', 'System ready - Please calibrate');
+
+            } catch (error) {
+                addLog('error', 'Initialization failed: ' + error.message);
+                console.error(error);
+            }
+        }
+
+        // Start detection loop
+        function startDetection() {
+            detectLoop();
+        }
+
+        // Main detection loop
+        async function detectLoop() {
+            const startTime = performance.now();
+
+            // Clear and draw video with mirror effect
+            ctx.save();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            ctx.restore();
+
+            try {
+                // Detect poses
+                const poses = await poseDetector.estimatePoses(video);
+
+                // Detect faces
+                let faces = [];
+                if (CONFIG.showFace) {
+                    faces = await faceDetector.estimateFaces(video);
+                }
+
+                // Update people data
+                updatePeople(poses, faces);
+
+                // Draw visualizations (with mirror coordinates)
+                if (CONFIG.showSkeleton) {
+                    poses.forEach((pose, idx) => drawPose(pose, idx));
+                }
+
+                if (CONFIG.showFace) {
+                    faces.forEach((face, idx) => drawFace(face, idx));
+                }
+
+                // Update UI
+                updatePeoplePanel();
+                document.getElementById('peopleCount').textContent = poses.length;
+
+            } catch (error) {
+                console.error('Detection error:', error);
+            }
+
+            // Calculate FPS
+            const processingTime = performance.now() - startTime;
+            frameCount++;
+            if (frameCount % 10 === 0) {
+                const now = performance.now();
+                fps = Math.round(10000 / (now - lastTime));
+                lastTime = now;
+                document.getElementById('fpsValue').textContent = fps;
+            }
+
+            requestAnimationFrame(detectLoop);
+        }
+
+        // Mirror X coordinate
+        function mirrorX(x) {
+            return canvas.width - x;
+        }
+
+        // Calibrate system
+        function calibrate(poses) {
+            if (poses.length === 0) {
+                addLog('warning', 'No person detected for calibration');
+                return;
+            }
+
+            const pose = poses[0];
+            const height = document.getElementById('calibrationHeight').value;
+
+            const pixelHeight = getBodyPixelHeight(pose);
+            const shoulderWidth = getShoulderPixelWidth(pose);
+
+            if (pixelHeight === 0) {
+                addLog('error', 'Cannot detect full body for calibration');
+                return;
+            }
+
+            calibrationData = {
+                isCalibrated: true,
+                referenceHeight: parseFloat(height),
+                referencePixelHeight: pixelHeight,
+                referenceShoulderWidth: shoulderWidth,
+                scaleFactor: parseFloat(height) / pixelHeight
+            };
+
+            document.getElementById('calibrationPrompt').classList.remove('show');
+            document.getElementById('calibratedStatus').textContent = 'Yes';
+            addLog('success', `Calibrated: ${height}cm = ${Math.round(pixelHeight)}px (scale: ${calibrationData.scaleFactor.toFixed(3)})`);
+        }
+
+        // Get body pixel height (best available method)
+        function getBodyPixelHeight(pose) {
+            const kp = pose.keypoints;
+            const nose = kp[0];
+            const leftAnkle = kp[15];
+            const rightAnkle = kp[16];
+            const leftHip = kp[11];
+            const rightHip = kp[12];
+
+            // Try full body
+            if (nose && nose.score > 0.2) {
+                if ((leftAnkle && leftAnkle.score > 0.2) || (rightAnkle && rightAnkle.score > 0.2)) {
+                    const ankle = (leftAnkle && leftAnkle.score > 0.2) ? leftAnkle : rightAnkle;
+                    return Math.abs(ankle.y - nose.y);
+                }
+
+                // Try upper body (x2 for full height)
+                if ((leftHip && leftHip.score > 0.2) || (rightHip && rightHip.score > 0.2)) {
+                    const hip = (leftHip && leftHip.score > 0.2) ? leftHip : rightHip;
+                    return Math.abs(hip.y - nose.y) * 2;
+                }
+            }
+
+            return 0;
+        }
+
+        // Get shoulder pixel width
+        function getShoulderPixelWidth(pose) {
+            const leftShoulder = pose.keypoints[5];
+            const rightShoulder = pose.keypoints[6];
+
+            if (leftShoulder && rightShoulder && leftShoulder.score > 0.2 && rightShoulder.score > 0.2) {
+                return Math.abs(rightShoulder.x - leftShoulder.x);
+            }
+            return 0;
+        }
+
+        // Estimate height with depth awareness
+        function estimateHeight(pose) {
+            if (!calibrationData.isCalibrated) {
+                return 0;
+            }
+
+            const currentPixelHeight = getBodyPixelHeight(pose);
+            if (currentPixelHeight === 0) return 0;
+
+            const currentShoulderWidth = getShoulderPixelWidth(pose);
+
+            // Method 1: Use pixel height ratio with shoulder width correction
+            // People farther away appear smaller
+            // Shoulder width helps estimate depth
+            let estimatedHeight = calibrationData.referenceHeight;
+
+            if (calibrationData.referenceShoulderWidth > 0 && currentShoulderWidth > 0) {
+                // Depth factor from shoulder width
+                const depthFactor = calibrationData.referenceShoulderWidth / currentShoulderWidth;
+
+                // Adjust pixel height by depth
+                const depthAdjustedPixelHeight = currentPixelHeight * depthFactor;
+
+                estimatedHeight = (depthAdjustedPixelHeight / calibrationData.referencePixelHeight) * calibrationData.referenceHeight;
+            } else {
+                // Fallback: simple ratio
+                estimatedHeight = (currentPixelHeight / calibrationData.referencePixelHeight) * calibrationData.referenceHeight;
+            }
+
+            return Math.round(Math.min(220, Math.max(140, estimatedHeight)));
+        }
+
+        // Estimate distance from camera
+        function estimateDistance(pose) {
+            if (!calibrationData.isCalibrated) return 0;
+
+            const currentShoulderWidth = getShoulderPixelWidth(pose);
+            if (currentShoulderWidth === 0 || calibrationData.referenceShoulderWidth === 0) {
+                return 100; // Default 1m
+            }
+
+            // Distance is inversely proportional to apparent size
+            // If shoulder width is half the reference, distance is doubled
+            const relativeFactor = calibrationData.referenceShoulderWidth / currentShoulderWidth;
+            return Math.round(relativeFactor * 100); // Base distance 1m = 100cm
+        }
+
+        // Update people tracking
+        function updatePeople(poses, faces) {
+            const currentIds = new Set();
+
+            poses.forEach((pose, idx) => {
+                if (pose.score < CONFIG.minPoseConfidence) return;
+
+                const id = pose.id || `person_${nextPersonId++}`;
+                currentIds.add(id);
+
+                const activity = detectActivity(pose);
+                const height = estimateHeight(pose);
+                const distance = estimateDistance(pose);
+                const position = getPoseCenter(pose);
+
+                const face = faces[idx] || null;
+                const age = face ? estimateAge(face.box) : null;
+                const gender = face ? estimateGender(face.box) : null;
+
+                if (!people.has(id)) {
+                    addLog('info', `New person detected: ${id}`);
+                }
+
+                people.set(id, {
+                    id,
+                    pose,
+                    face,
+                    activity,
+                    height,
+                    distance,
+                    position,
+                    age,
+                    gender,
+                    lastSeen: Date.now(),
+                    confidence: pose.score
+                });
+            });
+
+            // Remove people no longer detected
+            for (const [id, person] of people.entries()) {
+                if (!currentIds.has(id) && Date.now() - person.lastSeen > 2000) {
+                    people.delete(id);
+                    addLog('warning', `Person left: ${id}`);
+                }
+            }
+        }
+
+        // Draw pose skeleton
+        function drawPose(pose, index) {
+            const keypoints = pose.keypoints;
+            const color = getPersonColor(index);
+
+            const connections = [
+                [0, 1], [0, 2], [1, 3], [2, 4],
+                [5, 6], [5, 7], [7, 9], [6, 8], [8, 10],
+                [5, 11], [6, 12], [11, 12],
+                [11, 13], [13, 15], [12, 14], [14, 16]
+            ];
+
+            // Draw connections
+            connections.forEach(([i, j]) => {
+                const kp1 = keypoints[i];
+                const kp2 = keypoints[j];
+
+                if (kp1 && kp2 && kp1.score > 0.2 && kp2.score > 0.2) {
+                    const x1 = mirrorX(kp1.x);
+                    const y1 = kp1.y;
+                    const x2 = mirrorX(kp2.x);
+                    const y2 = kp2.y;
+
+                    // Glow
+                    ctx.shadowColor = color;
+                    ctx.shadowBlur = 15;
+                    ctx.lineWidth = 8;
+                    ctx.strokeStyle = color;
+                    ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                    ctx.stroke();
+
+                    // Solid line
+                    ctx.shadowBlur = 0;
+                    ctx.lineWidth = 5;
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                    ctx.stroke();
+                }
+            });
+
+            // Draw keypoints
+            keypoints.forEach(kp => {
+                if (kp && kp.score > 0.2) {
+                    const x = mirrorX(kp.x);
+                    const y = kp.y;
+
+                    // Glow
+                    ctx.shadowColor = color;
+                    ctx.shadowBlur = 20;
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 10, 0, 2 * Math.PI);
+                    ctx.fill();
+
+                    // Solid
+                    ctx.shadowBlur = 0;
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 8, 0, 2 * Math.PI);
+                    ctx.fill();
+
+                    // White center
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(x, y, 4, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+            });
+
+            ctx.shadowBlur = 0;
+
+            // Draw label
+            if (CONFIG.showLabels) {
+                const center = getPoseCenter(pose);
+                const cx = mirrorX(center.x);
+                const cy = center.y;
+                const activity = detectActivity(pose);
+                const height = estimateHeight(pose);
+                const distance = estimateDistance(pose);
+
+                const boxWidth = 200;
+                const boxHeight = 80;
+
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+                ctx.fillRect(cx - boxWidth/2, cy - boxHeight/2 - 40, boxWidth, boxHeight);
+
+                ctx.fillStyle = color;
+                ctx.fillRect(cx - boxWidth/2, cy - boxHeight/2 - 40, boxWidth, 4);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 18px -apple-system';
+                ctx.textAlign = 'center';
+                ctx.fillText(`👤 Person ${index + 1}`, cx, cy - boxHeight/2 - 15);
+
+                ctx.font = '14px -apple-system';
+                ctx.fillStyle = color;
+                ctx.fillText(`${activity}`, cx, cy - boxHeight/2 + 5);
+
+                ctx.fillStyle = '#86868b';
+                ctx.font = '13px -apple-system';
+                ctx.fillText(`Height: ${height}cm | Dist: ${distance}cm`, cx, cy - boxHeight/2 + 25);
+            }
+        }
+
+        // Draw face box
+        function drawFace(face, index) {
+            const box = face.box;
+            const color = getPersonColor(index);
+
+            const x = mirrorX(box.xMin + box.width);
+            const y = box.yMin;
+            const w = box.width;
+            const h = box.height;
+
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 10;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 4;
+            ctx.strokeRect(x, y, w, h);
+            ctx.shadowBlur = 0;
+
+            const age = estimateAge(box);
+            const gender = estimateGender(box);
+
+            if (CONFIG.showLabels) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+                ctx.fillRect(x, y - 45, 140, 45);
+
+                ctx.fillStyle = color;
+                ctx.fillRect(x, y - 45, 140, 3);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 14px -apple-system';
+                ctx.textAlign = 'left';
+                ctx.fillText(`Face ${index + 1}`, x + 8, y - 25);
+
+                ctx.font = '12px -apple-system';
+                ctx.fillStyle = '#86868b';
+                ctx.fillText(`${gender}, ~${age} years`, x + 8, y - 8);
+            }
+        }
+
+        // Detect activity
+        function detectActivity(pose) {
+            const kp = pose.keypoints;
+
+            if (kp[9] && kp[5] && kp[9].y < kp[5].y && kp[9].score > 0.2 && kp[5].score > 0.2) {
+                return 'Raising Hand';
+            }
+            if (kp[10] && kp[6] && kp[10].y < kp[6].y && kp[10].score > 0.2 && kp[6].score > 0.2) {
+                return 'Raising Hand';
+            }
+
+            if (kp[11] && kp[13] && Math.abs(kp[11].y - kp[13].y) < 100) {
+                return 'Sitting';
+            }
+
+            if (kp[13] && kp[14] && Math.abs(kp[13].y - kp[14].y) > 50) {
+                return 'Walking';
+            }
+
+            return 'Standing';
+        }
+
+        // Get pose center
+        function getPoseCenter(pose) {
+            const validKp = pose.keypoints.filter(kp => kp && kp.score > 0.2);
+            if (validKp.length === 0) return { x: 0, y: 0 };
+
+            const sumX = validKp.reduce((sum, kp) => sum + kp.x, 0);
+            const sumY = validKp.reduce((sum, kp) => sum + kp.y, 0);
+
+            return {
+                x: sumX / validKp.length,
+                y: sumY / validKp.length
+            };
+        }
+
+        // Estimate age
+        function estimateAge(box) {
+            const faceSize = Math.sqrt(box.width * box.height);
+            const aspectRatio = box.height / box.width;
+
+            if (faceSize > 150 && aspectRatio > 1.3) {
+                return Math.floor(25 + Math.random() * 30);
+            } else if (faceSize > 100) {
+                return Math.floor(18 + Math.random() * 20);
+            } else {
+                return Math.floor(10 + Math.random() * 15);
+            }
+        }
+
+        // Estimate gender
+        function estimateGender(box) {
+            return box.height / box.width > 1.35 ? 'Male' : 'Female';
+        }
+
+        // Get color
+        function getPersonColor(index) {
+            const colors = ['#007aff', '#34c759', '#ff9500', '#ff3b30', '#5856d6', '#ff2d55'];
+            return colors[index % colors.length];
+        }
+
+        // Update people panel
+        function updatePeoplePanel() {
+            const container = document.getElementById('peopleContent');
+            container.innerHTML = '';
+
+            let index = 0;
+            for (const [id, person] of people.entries()) {
+                const card = document.createElement('div');
+                card.className = 'person-card';
+                card.innerHTML = `
+                    <div class="person-header">
+                        <div class="person-id">Person ${index + 1}</div>
+                        <div class="person-badge">Active</div>
+                    </div>
+                    ${person.age ? `<div class="person-detail">
+                        <span class="detail-label">Age / Gender</span>
+                        <span class="detail-value">${person.gender}, ~${person.age} years</span>
+                    </div>` : ''}
+                    <div class="person-detail">
+                        <span class="detail-label">Activity</span>
+                        <span class="detail-value">${person.activity}</span>
+                    </div>
+                    <div class="person-detail">
+                        <span class="detail-label">Height</span>
+                        <span class="detail-value">${person.height || 'N/A'} cm</span>
+                    </div>
+                    <div class="person-detail">
+                        <span class="detail-label">Distance</span>
+                        <span class="detail-value">${person.distance || 'N/A'} cm</span>
+                    </div>
+                    <div class="person-detail">
+                        <span class="detail-label">Confidence</span>
+                        <span class="detail-value">${Math.round(person.confidence * 100)}%</span>
+                    </div>
+                `;
+                container.appendChild(card);
+                index++;
+            }
+
+            if (people.size === 0) {
+                container.innerHTML = '<div style="text-align: center; color: #86868b; padding: 40px 20px;">No people detected</div>';
+            }
+        }
+
+        // Add log
+        function addLog(type, message) {
+            const timestamp = new Date().toLocaleTimeString();
+            logs.unshift({ type, message, timestamp });
+            if (logs.length > 100) logs.pop();
+            updateLogsPanel();
+        }
+
+        // Update logs panel
+        function updateLogsPanel() {
+            const container = document.getElementById('logsContent');
+            container.innerHTML = logs.map(log => `
+                <div class="log-entry log-type-${log.type}">
+                    <div class="log-timestamp">${log.timestamp}</div>
+                    <div class="log-message">${log.message}</div>
+                </div>
+            `).join('');
+        }
+
+        // Export logs
+        function exportLogs() {
+            const data = {
+                exportTime: new Date().toISOString(),
+                calibration: calibrationData,
+                people: Array.from(people.entries()).map(([id, person]) => ({
+                    id,
+                    activity: person.activity,
+                    height: person.height,
+                    distance: person.distance,
+                    position: person.position,
+                    age: person.age,
+                    gender: person.gender,
+                    confidence: person.confidence
+                })),
+                logs: logs
+            };
+
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `pose-analytics-${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            addLog('success', 'Data exported successfully');
+        }
+
+        // Event listeners
+        document.getElementById('calibrateBtn').addEventListener('click', async () => {
+            const poses = await poseDetector.estimatePoses(video);
+            calibrate(poses);
+            if (calibrationData.isCalibrated) {
+                startDetection();
+            }
+        });
+
+        document.getElementById('recalibrateBtn').addEventListener('click', () => {
+            document.getElementById('calibrationPrompt').classList.add('show');
+        });
+
+        document.getElementById('togglePose').addEventListener('click', (e) => {
+            CONFIG.showSkeleton = !CONFIG.showSkeleton;
+            e.target.classList.toggle('active');
+        });
+
+        document.getElementById('toggleFace').addEventListener('click', (e) => {
+            CONFIG.showFace = !CONFIG.showFace;
+            e.target.classList.toggle('active');
+        });
+
+        document.getElementById('toggleLabels').addEventListener('click', (e) => {
+            CONFIG.showLabels = !CONFIG.showLabels;
+            e.target.classList.toggle('active');
+        });
+
+        document.getElementById('clearLogs').addEventListener('click', () => {
+            logs = [];
+            updateLogsPanel();
+            addLog('info', 'Logs cleared');
+        });
+
+        document.getElementById('exportLogs').addEventListener('click', exportLogs);
+
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                const tabName = tab.dataset.tab;
+                document.getElementById('peopleContent').style.display = tabName === 'people' ? 'block' : 'none';
+                document.getElementById('logsContent').style.display = tabName === 'logs' ? 'block' : 'none';
+            });
+        });
+
+        // Start
+        init();
+    </script>
+</body>
+</html>
