@@ -4,7 +4,39 @@ Collection of real-time computer vision, AI, and video streaming demos using web
 
 ## 🎯 Live Demos
 
-### 🦴 Pose Analytics V2 (NEW!)
+### 🏋️ AI Fitness Trainer (NEW!)
+**Your personal AI-powered workout assistant**
+
+🔗 **[Try AI Fitness Trainer](https://hwkim3330.github.io/cam/fitness-trainer.html)**
+
+**Features:**
+- 🏋️ **4 Exercises**: Squat, Push-Up, Jumping Jack, Plank
+- 🤖 **AI Rep Counting**: Automatic detection and counting
+- 📐 **Angle Detection**: Validates proper form using joint angles
+- 💬 **Real-time Feedback**: "Perfect form!" or "Keep body straight"
+- 🔥 **Calorie Tracking**: Estimates calories burned
+- ⏱️ **Workout Timer**: Tracks exercise duration
+- 📊 **Progress Charts**: Visualize your improvement (Chart.js)
+- 💾 **Workout History**: Saves last 50 workouts
+- 🎯 **Daily Goals**: Track progress toward 50 reps/day
+- 🎨 **Apple Fitness+ UI**: Beautiful gradient purple design
+
+**How it Works:**
+1. Select exercise (Squat, Push-up, Jumping Jack, or Plank)
+2. Click "Start" and begin exercising
+3. AI detects your pose and counts reps automatically
+4. Get real-time feedback on your form
+5. View stats and history in side panel
+
+**Exercise Detection:**
+- **Squat**: Knee angle detection (< 100° down, > 160° up)
+- **Push-Up**: Elbow angle detection (< 90° down, > 160° up)
+- **Jumping Jack**: Arms + legs position tracking
+- **Plank**: Body alignment validation (160-200°)
+
+---
+
+### 🦴 Pose Analytics V2
 **Real-time multi-person pose tracking with depth awareness**
 
 🔗 **[Try Pose Analytics V2](https://hwkim3330.github.io/cam/pose-analytics-v2.html)**
@@ -136,6 +168,7 @@ Features:
 
 | Demo | FPS | Latency | Max People |
 |------|-----|---------|------------|
+| AI Fitness Trainer | 30-60 | <30ms | 1 |
 | Pose Analytics V2 | 30-60 | <50ms | 10 |
 | Pose Analytics V1 | 30-60 | <50ms | 10 |
 | Puzzle CAPTCHA | 30-60 | <30ms | 1 |
@@ -270,6 +303,7 @@ Features:
 ## 🔗 Links
 
 - **GitHub Repository**: [hwkim3330/cam](https://github.com/hwkim3330/cam)
+- **AI Fitness Trainer**: https://hwkim3330.github.io/cam/fitness-trainer.html
 - **Pose Analytics V2**: https://hwkim3330.github.io/cam/pose-analytics-v2.html
 - **Pose Analytics V1**: https://hwkim3330.github.io/cam/pose-analytics.html
 - **Puzzle CAPTCHA**: https://hwkim3330.github.io/cam/puzzle-captcha.html
