@@ -36,6 +36,37 @@ Collection of real-time computer vision, AI, and video streaming demos using web
 
 ---
 
+### 🎤 AI Voice Assistant (NEW!)
+**Siri-style voice assistant with stunning audio visualization**
+
+🔗 **[Try Voice Assistant](https://hwkim3330.github.io/cam/voice-assistant.html)**
+
+**Features:**
+- 🎤 **Speech Recognition**: Natural Korean voice commands
+- 🔊 **Voice Responses**: Text-to-speech synthesis
+- 📊 **Real-time Audio Visualization**: Circular waveform with Web Audio API
+- 🎨 **Apple Siri UI**: Animated gradient background with glassmorphism
+- 🤖 **AI Capabilities**: Time, date, weather, calculator, jokes
+- 💾 **Conversation History**: Saves last 20 conversations
+- ✨ **Smooth Animations**: Apple-style transitions and effects
+
+**Voice Commands:**
+- ⏰ **Time**: "지금 몇 시야?"
+- 📅 **Date**: "오늘 날짜 알려줘"
+- 🌤️ **Weather**: "날씨 어때?"
+- 🔢 **Calculator**: "10 더하기 25는?"
+- 😄 **Jokes**: "농담 해줘"
+- ❓ **Help**: "뭐 할 수 있어?"
+
+**Web Technologies:**
+- Web Speech API (Recognition + Synthesis)
+- Web Audio API (AnalyserNode for visualization)
+- MediaDevices API (microphone access)
+- Canvas API (circular waveform rendering)
+- localStorage (conversation history)
+
+---
+
 ### 🦴 Pose Analytics V2
 **Real-time multi-person pose tracking with depth awareness**
 
@@ -151,6 +182,11 @@ Features:
 - **MediaPipe** - Hand tracking & face detection
 - **Canvas API** - Real-time rendering with effects
 
+### Voice & Audio
+- **Web Speech API** - Speech Recognition & Synthesis
+- **Web Audio API** - Real-time audio visualization & analysis
+- **MediaDevices API** - Microphone access
+
 ### Networking
 - **WebRTC** - Peer-to-peer communication
 - **PeerJS** - Simplified WebRTC
@@ -169,6 +205,7 @@ Features:
 | Demo | FPS | Latency | Max People |
 |------|-----|---------|------------|
 | AI Fitness Trainer | 30-60 | <30ms | 1 |
+| Voice Assistant | 60 | <20ms | N/A |
 | Pose Analytics V2 | 30-60 | <50ms | 10 |
 | Pose Analytics V1 | 30-60 | <50ms | 10 |
 | Puzzle CAPTCHA | 30-60 | <30ms | 1 |
@@ -176,9 +213,10 @@ Features:
 
 **System Requirements:**
 - Modern browser (Chrome/Edge recommended)
-- Webcam
+- Webcam (for vision demos)
+- Microphone (for Voice Assistant)
 - GPU acceleration (optional but recommended)
-- HTTPS connection (required for camera access)
+- HTTPS connection (required for camera/mic access)
 
 ---
 
@@ -304,6 +342,7 @@ Features:
 
 - **GitHub Repository**: [hwkim3330/cam](https://github.com/hwkim3330/cam)
 - **AI Fitness Trainer**: https://hwkim3330.github.io/cam/fitness-trainer.html
+- **Voice Assistant**: https://hwkim3330.github.io/cam/voice-assistant.html
 - **Pose Analytics V2**: https://hwkim3330.github.io/cam/pose-analytics-v2.html
 - **Pose Analytics V1**: https://hwkim3330.github.io/cam/pose-analytics.html
 - **Puzzle CAPTCHA**: https://hwkim3330.github.io/cam/puzzle-captcha.html
