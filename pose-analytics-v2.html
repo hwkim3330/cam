@@ -89,77 +89,106 @@
             border-color: rgba(0, 122, 255, 1);
         }
 
-        .calibration-prompt {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.95);
-            backdrop-filter: blur(20px);
-            padding: 40px;
-            border-radius: 20px;
-            text-align: center;
-            max-width: 500px;
-            border: 2px solid #007aff;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-            display: none;
-            z-index: 10001;
-        }
-
-        .calibration-prompt.show {
-            display: block;
-        }
-
-        .calibration-title {
-            font-size: 24px;
-            font-weight: 700;
+        .settings-section {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
             margin-bottom: 16px;
         }
 
-        .calibration-text {
+        .settings-title {
             font-size: 16px;
-            color: #86868b;
-            margin-bottom: 24px;
-            line-height: 1.5;
-        }
-
-        .calibration-input {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-
-        .calibration-input input {
-            padding: 12px 20px;
-            font-size: 18px;
-            border: 2px solid #007aff;
-            background: rgba(0, 122, 255, 0.1);
-            color: white;
-            border-radius: 8px;
-            width: 120px;
-            text-align: center;
-        }
-
-        .calibration-input label {
-            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 8px;
             color: #ffffff;
         }
 
-        .calibration-btn {
-            background: #007aff;
+        .settings-description {
+            font-size: 13px;
+            color: #86868b;
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+
+        .settings-control {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .settings-control label {
+            font-size: 13px;
+            color: #86868b;
+            min-width: 140px;
+        }
+
+        .settings-control input[type="number"] {
+            padding: 8px 12px;
+            font-size: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
             color: white;
-            border: none;
-            padding: 12px 30px;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
+            border-radius: 6px;
+            width: 80px;
+            text-align: center;
+        }
+
+        .settings-control input[type="range"] {
+            flex: 1;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            outline: none;
+        }
+
+        .settings-control input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #007aff;
+            border-radius: 50%;
             cursor: pointer;
         }
 
-        .calibration-btn:hover {
+        .settings-control span {
+            font-size: 13px;
+            color: #ffffff;
+            min-width: 50px;
+            text-align: right;
+        }
+
+        .settings-btn {
+            background: #007aff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 12px;
+        }
+
+        .settings-btn:hover {
             background: #0051d5;
+        }
+
+        .settings-status {
+            margin-top: 12px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            font-size: 13px;
+            color: #86868b;
+            text-align: center;
+        }
+
+        .settings-status span {
+            color: #ffffff;
+            font-weight: 600;
         }
 
         .stats-overlay {
@@ -406,19 +435,6 @@
         <div class="loading-text">Loading AI Models...</div>
     </div>
 
-    <div class="calibration-prompt" id="calibrationPrompt">
-        <div class="calibration-title">📏 Calibration Required</div>
-        <div class="calibration-text">
-            Stand at a comfortable distance from the camera and enter your real height for accurate measurements.
-            This will calibrate the system to measure others correctly based on depth.
-        </div>
-        <div class="calibration-input">
-            <label>Your Height:</label>
-            <input type="number" id="calibrationHeight" value="170" min="140" max="220">
-            <span>cm</span>
-        </div>
-        <button class="calibration-btn" id="calibrateBtn">Calibrate</button>
-    </div>
 
     <div class="main-container">
         <div class="video-panel">
@@ -426,7 +442,6 @@
                 <button class="control-btn active" id="togglePose">🦴 Skeleton</button>
                 <button class="control-btn active" id="toggleFace">👤 Face</button>
                 <button class="control-btn active" id="toggleLabels">🏷️ Labels</button>
-                <button class="control-btn" id="recalibrateBtn">📏 Recalibrate</button>
             </div>
 
             <div class="stats-overlay">
@@ -459,11 +474,57 @@
             <div class="tabs">
                 <div class="tab active" data-tab="people">👥 People</div>
                 <div class="tab" data-tab="logs">📋 Logs</div>
+                <div class="tab" data-tab="settings">⚙️ Settings</div>
             </div>
 
             <div class="content-area">
                 <div id="peopleContent"></div>
                 <div id="logsContent" style="display: none;"></div>
+                <div id="settingsContent" style="display: none;">
+                    <div class="settings-section">
+                        <div class="settings-title">📏 Height Calibration</div>
+                        <div class="settings-description">
+                            Calibrate for accurate height measurements based on your real height.
+                        </div>
+                        <div class="settings-control">
+                            <label>Your Real Height:</label>
+                            <input type="number" id="calibrationHeight" value="170" min="140" max="220">
+                            <span>cm</span>
+                        </div>
+                        <button class="settings-btn" id="calibrateBtn">Calibrate Now</button>
+                        <div class="settings-status" id="calibrationStatus">
+                            Status: <span id="calibStatusText">Not Calibrated</span>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <div class="settings-title">🎨 Display Options</div>
+                        <div class="settings-control">
+                            <label>Skeleton Line Width:</label>
+                            <input type="range" id="skeletonWidth" min="4" max="16" value="10" step="1">
+                            <span id="skeletonWidthValue">10px</span>
+                        </div>
+                        <div class="settings-control">
+                            <label>Keypoint Size:</label>
+                            <input type="range" id="keypointSize" min="4" max="20" value="12" step="1">
+                            <span id="keypointSizeValue">12px</span>
+                        </div>
+                        <div class="settings-control">
+                            <label>Glow Intensity:</label>
+                            <input type="range" id="glowIntensity" min="0" max="30" value="15" step="1">
+                            <span id="glowIntensityValue">15</span>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <div class="settings-title">🔍 Detection Sensitivity</div>
+                        <div class="settings-control">
+                            <label>Min Confidence:</label>
+                            <input type="range" id="minConfidence" min="0.1" max="0.5" value="0.2" step="0.05">
+                            <span id="minConfidenceValue">0.2</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="action-buttons">
@@ -479,17 +540,20 @@
             showSkeleton: true,
             showFace: true,
             showLabels: true,
-            minPoseConfidence: 0.15,
-            minFaceConfidence: 0.3
+            minPoseConfidence: 0.2,
+            minFaceConfidence: 0.3,
+            skeletonLineWidth: 10,
+            keypointSize: 12,
+            glowIntensity: 15
         };
 
-        // Calibration data
+        // Calibration data - default values for immediate use
         let calibrationData = {
-            isCalibrated: false,
+            isCalibrated: true, // Start calibrated with default values
             referenceHeight: 170, // Real height in cm
-            referencePixelHeight: 0, // Pixel height at calibration
-            referenceShoulderWidth: 0, // Shoulder width at calibration
-            scaleFactor: 1.0
+            referencePixelHeight: 400, // Default pixel height
+            referenceShoulderWidth: 150, // Default shoulder width
+            scaleFactor: 0.425 // 170/400
         };
 
         // Global variables
@@ -549,10 +613,11 @@
                 addLog('success', 'Face Detection loaded');
 
                 document.getElementById('loadingScreen').classList.add('hidden');
-                document.getElementById('calibrationPrompt').classList.add('show');
-                addLog('info', 'System ready - Please calibrate');
+                addLog('success', 'System ready - Using default calibration');
+                document.getElementById('calibratedStatus').textContent = 'Yes (Default)';
+                document.getElementById('calibStatusText').textContent = 'Using Default Values';
 
-                // Start detection loop immediately for camera preview
+                // Start detection loop immediately
                 detectLoop();
 
             } catch (error) {
@@ -647,8 +712,8 @@
                 scaleFactor: parseFloat(height) / pixelHeight
             };
 
-            document.getElementById('calibrationPrompt').classList.remove('show');
-            document.getElementById('calibratedStatus').textContent = 'Yes';
+            document.getElementById('calibratedStatus').textContent = 'Yes (Custom)';
+            document.getElementById('calibStatusText').textContent = `Calibrated at ${height}cm`;
             addLog('success', `Calibrated: ${height}cm = ${Math.round(pixelHeight)}px (scale: ${calibrationData.scaleFactor.toFixed(3)})`);
         }
 
@@ -800,7 +865,7 @@
                 const kp1 = keypoints[i];
                 const kp2 = keypoints[j];
 
-                if (kp1 && kp2 && kp1.score > 0.2 && kp2.score > 0.2) {
+                if (kp1 && kp2 && kp1.score > CONFIG.minPoseConfidence && kp2.score > CONFIG.minPoseConfidence) {
                     const x1 = mirrorX(kp1.x);
                     const y1 = kp1.y;
                     const x2 = mirrorX(kp2.x);
@@ -808,8 +873,8 @@
 
                     // Glow
                     ctx.shadowColor = color;
-                    ctx.shadowBlur = 15;
-                    ctx.lineWidth = 8;
+                    ctx.shadowBlur = CONFIG.glowIntensity;
+                    ctx.lineWidth = CONFIG.skeletonLineWidth;
                     ctx.strokeStyle = color;
                     ctx.lineCap = 'round';
                     ctx.beginPath();
@@ -819,7 +884,7 @@
 
                     // Solid line
                     ctx.shadowBlur = 0;
-                    ctx.lineWidth = 5;
+                    ctx.lineWidth = CONFIG.skeletonLineWidth - 3;
                     ctx.beginPath();
                     ctx.moveTo(x1, y1);
                     ctx.lineTo(x2, y2);
@@ -829,29 +894,29 @@
 
             // Draw keypoints
             keypoints.forEach(kp => {
-                if (kp && kp.score > 0.2) {
+                if (kp && kp.score > CONFIG.minPoseConfidence) {
                     const x = mirrorX(kp.x);
                     const y = kp.y;
 
                     // Glow
                     ctx.shadowColor = color;
-                    ctx.shadowBlur = 20;
+                    ctx.shadowBlur = CONFIG.glowIntensity * 1.5;
                     ctx.fillStyle = color;
                     ctx.beginPath();
-                    ctx.arc(x, y, 10, 0, 2 * Math.PI);
+                    ctx.arc(x, y, CONFIG.keypointSize, 0, 2 * Math.PI);
                     ctx.fill();
 
                     // Solid
                     ctx.shadowBlur = 0;
                     ctx.fillStyle = color;
                     ctx.beginPath();
-                    ctx.arc(x, y, 8, 0, 2 * Math.PI);
+                    ctx.arc(x, y, CONFIG.keypointSize - 2, 0, 2 * Math.PI);
                     ctx.fill();
 
                     // White center
                     ctx.fillStyle = '#ffffff';
                     ctx.beginPath();
-                    ctx.arc(x, y, 4, 0, 2 * Math.PI);
+                    ctx.arc(x, y, CONFIG.keypointSize / 2.5, 0, 2 * Math.PI);
                     ctx.fill();
                 }
             });
@@ -1088,8 +1153,25 @@
             calibrate(poses);
         });
 
-        document.getElementById('recalibrateBtn').addEventListener('click', () => {
-            document.getElementById('calibrationPrompt').classList.add('show');
+        // Settings sliders
+        document.getElementById('skeletonWidth').addEventListener('input', (e) => {
+            CONFIG.skeletonLineWidth = parseInt(e.target.value);
+            document.getElementById('skeletonWidthValue').textContent = e.target.value + 'px';
+        });
+
+        document.getElementById('keypointSize').addEventListener('input', (e) => {
+            CONFIG.keypointSize = parseInt(e.target.value);
+            document.getElementById('keypointSizeValue').textContent = e.target.value + 'px';
+        });
+
+        document.getElementById('glowIntensity').addEventListener('input', (e) => {
+            CONFIG.glowIntensity = parseInt(e.target.value);
+            document.getElementById('glowIntensityValue').textContent = e.target.value;
+        });
+
+        document.getElementById('minConfidence').addEventListener('input', (e) => {
+            CONFIG.minPoseConfidence = parseFloat(e.target.value);
+            document.getElementById('minConfidenceValue').textContent = e.target.value;
         });
 
         document.getElementById('togglePose').addEventListener('click', (e) => {
@@ -1124,6 +1206,7 @@
                 const tabName = tab.dataset.tab;
                 document.getElementById('peopleContent').style.display = tabName === 'people' ? 'block' : 'none';
                 document.getElementById('logsContent').style.display = tabName === 'logs' ? 'block' : 'none';
+                document.getElementById('settingsContent').style.display = tabName === 'settings' ? 'block' : 'none';
             });
         });
 
